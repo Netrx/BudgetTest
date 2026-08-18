@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>💰 Бюджет</title>
     
-    <!-- PWA Manifest -->
+    <!-- PWA Manifest (путь с /) -->
     <link rel="manifest" href="/manifest.json">
 
-    <!-- Иконки для разных устройств -->
+    <!-- Иконки (пути с /) -->
     <link rel="apple-touch-icon" href="/icons/icon-192.png">
     <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
     <link rel="icon" type="image/png" sizes="512x512" href="/icons/icon-512.png">
@@ -49,6 +49,7 @@
         // Проверяем поддержку Service Worker
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
+                // Регистрируем с правильным путём /
                 navigator.serviceWorker.register('/sw.js')
                     .then((registration) => {
                         console.log('Service Worker зарегистрирован:', registration.scope);
@@ -63,8 +64,6 @@
         window.addEventListener('beforeinstallprompt', (event) => {
             event.preventDefault();
             console.log('PWA установка доступна');
-            // Можете показать кнопку "Установить приложение"
-            // Пример: event.prompt();
         });
         
         window.addEventListener('appinstalled', () => {
