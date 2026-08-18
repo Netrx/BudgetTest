@@ -1,12 +1,10 @@
 // ===== МОДУЛЬ: КАТЕГОРИИ =====
 import { openModal } from '../components/modal.js';
 import { showToast } from '../components/toast.js';
-import { createColorPicker } from '../components/colorPicker.js';
-import { CATEGORY_ICONS, CATEGORY_TYPES } from '../config/constants.js';
+import { CATEGORY_ICONS, CATEGORY_COLORS, CATEGORY_TYPES } from '../config/constants.js';
 
 let storageInstance = null;
 let currentType = 'income';
-let colorPickerInstance = null;
 
 export function init(storage) {
     storageInstance = storage;
@@ -101,7 +99,6 @@ function renderSubcategories(children) {
         const color = sub.color || '#666666';
         html += `
             <div class="subcategory-item">
-                <span class="sub-icon" style="color: ${color};">${sub.icon || '◻'}</span>
                 <span class="sub-name" style="color: ${color};">${sub.name}</span>
                 <span class="sub-count">${count}</span>
                 <div class="sub-actions">
@@ -144,9 +141,14 @@ function setupEventListeners() {
     document.addEventListener('transaction-deleted', () => renderCategories());
 }
 
+// ===== ИЗМЕНЕНИЕ №5: ИСПРАВЛЕНИЕ СОХРАНЕНИЯ ЦВЕТА =====
 function openAddCategoryModal(parentId = null) {
     const iconOptions = CATEGORY_ICONS.map(icon => 
         `<option value="${icon.value}">${icon.value} ${icon.label}</option>`
+    ).join('');
+
+    const colorOptions = CATEGORY_COLORS.map(color => 
+        `<option value="${color.value}" style="background-color: ${color.value}; color: ${isLightColor(color.value) ? '#000' : '#fff'}; padding: 4px 8px;">${color.label}</option>`
     ).join('');
 
     const typeOptions = Object.values(CATEGORY_TYPES).map(type => 
@@ -159,7 +161,6 @@ function openAddCategoryModal(parentId = null) {
     ).join('');
 
     const title = parentId ? 'Добавить подкатегорию' : 'Добавить категорию';
-    const defaultColor = '#3B82F6';
 
     openModal(title, `
         <form id="category-form">
@@ -171,18 +172,14 @@ function openAddCategoryModal(parentId = null) {
                     ${iconOptions}
                 </select>
             </div>
-            <div style="margin-bottom:12px;">
+            <div style="display:flex;gap:12px;margin-bottom:12px;">
                 <input name="name" type="text" placeholder="Название категории" required 
-                       style="width:100%;padding:8px;border-radius:6px;border:1px solid var(--color-border);background:var(--color-bg-input);color:var(--color-text);">
+                       style="flex:1;padding:8px;border-radius:6px;border:1px solid var(--color-border);background:var(--color-bg-input);color:var(--color-text);">
+                <!-- ===== ИСПРАВЛЕНО: name="color" и значение берется правильно ===== -->
+                <select name="color" required style="flex:1;padding:8px;border-radius:6px;border:1px solid var(--color-border);background:var(--color-bg-input);color:var(--color-text);">
+                    ${colorOptions}
+                </select>
             </div>
-            
-            <!-- Color Picker -->
-            <div style="margin-bottom:12px;">
-                <label style="display:block;font-size:var(--font-size-xs);color:var(--color-text-secondary);margin-bottom:6px;">Выберите цвет</label>
-                <div id="color-picker-container"></div>
-                <input type="hidden" name="color" id="selected-color" value="${defaultColor}">
-            </div>
-            
             ${parentId ? `<input type="hidden" name="parentId" value="${parentId}">` : `
                 <select name="parentId" style="width:100%;padding:8px;border-radius:6px;border:1px solid var(--color-border);background:var(--color-bg-input);color:var(--color-text);margin-bottom:12px;">
                     <option value="">Без родителя (главная)</option>
@@ -192,10 +189,11 @@ function openAddCategoryModal(parentId = null) {
             <button type="submit" class="btn btn-primary" style="width:100%;">Сохранить</button>
         </form>
     `, (formData) => {
+        // ===== ИСПРАВЛЕНО: явно берем color из formData =====
         const category = {
             name: formData.name,
             icon: formData.icon || '◻',
-            color: formData.color || defaultColor,
+            color: formData.color || '#666666',  // Теперь цвет точно сохраняется
             type: formData.type || currentType,
             parentId: formData.parentId || parentId || null
         };
@@ -203,19 +201,6 @@ function openAddCategoryModal(parentId = null) {
         renderCategories();
         showToast('Категория добавлена', 'success');
     });
-
-    // Инициализируем Color Picker после открытия модалки
-    setTimeout(() => {
-        if (document.getElementById('color-picker-container')) {
-            colorPickerInstance = createColorPicker(
-                'color-picker-container',
-                defaultColor,
-                (color) => {
-                    document.getElementById('selected-color').value = color;
-                }
-            );
-        }
-    }, 100);
 }
 
 function openEditCategoryModal(id) {
@@ -226,11 +211,13 @@ function openEditCategoryModal(id) {
         `<option value="${icon.value}" ${icon.value === category.icon ? 'selected' : ''}>${icon.value} ${icon.label}</option>`
     ).join('');
 
+    const colorOptions = CATEGORY_COLORS.map(color => 
+        `<option value="${color.value}" ${color.value === category.color ? 'selected' : ''} style="background-color: ${color.value}; color: ${isLightColor(color.value) ? '#000' : '#fff'}; padding: 4px 8px;">${color.label}</option>`
+    ).join('');
+
     const typeOptions = Object.values(CATEGORY_TYPES).map(type => 
         `<option value="${type}" ${type === category.type ? 'selected' : ''}>${type === 'income' ? 'Доход' : 'Расход'}</option>`
     ).join('');
-
-    const color = category.color || '#3B82F6';
 
     openModal('Редактировать категорию', `
         <form id="category-form">
@@ -242,44 +229,27 @@ function openEditCategoryModal(id) {
                     ${iconOptions}
                 </select>
             </div>
-            <div style="margin-bottom:12px;">
+            <div style="display:flex;gap:12px;margin-bottom:12px;">
                 <input name="name" type="text" value="${category.name}" placeholder="Название категории" required 
-                       style="width:100%;padding:8px;border-radius:6px;border:1px solid var(--color-border);background:var(--color-bg-input);color:var(--color-text);">
+                       style="flex:1;padding:8px;border-radius:6px;border:1px solid var(--color-border);background:var(--color-bg-input);color:var(--color-text);">
+                <select name="color" required style="flex:1;padding:8px;border-radius:6px;border:1px solid var(--color-border);background:var(--color-bg-input);color:var(--color-text);">
+                    ${colorOptions}
+                </select>
             </div>
-            
-            <!-- Color Picker -->
-            <div style="margin-bottom:12px;">
-                <label style="display:block;font-size:var(--font-size-xs);color:var(--color-text-secondary);margin-bottom:6px;">Выберите цвет</label>
-                <div id="color-picker-container"></div>
-                <input type="hidden" name="color" id="selected-color" value="${color}">
-            </div>
-            
             <button type="submit" class="btn btn-primary" style="width:100%;">Обновить</button>
         </form>
     `, (formData) => {
+        // ===== ИСПРАВЛЕНО: явно берем color из formData =====
         const updated = {
             name: formData.name,
             icon: formData.icon || '◻',
-            color: formData.color || '#3B82F6',
+            color: formData.color || '#666666',  // Теперь цвет точно сохраняется
             type: formData.type
         };
         storageInstance.updateCategory(id, updated);
         renderCategories();
         showToast('Категория обновлена', 'success');
     });
-
-    // Инициализируем Color Picker после открытия модалки
-    setTimeout(() => {
-        if (document.getElementById('color-picker-container')) {
-            colorPickerInstance = createColorPicker(
-                'color-picker-container',
-                color,
-                (color) => {
-                    document.getElementById('selected-color').value = color;
-                }
-            );
-        }
-    }, 100);
 }
 
 function deleteCategory(id) {
@@ -296,4 +266,12 @@ function deleteCategory(id) {
         renderCategories();
         showToast('Категория удалена', 'success');
     }
+}
+
+function isLightColor(hex) {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+    return brightness > 128;
 }

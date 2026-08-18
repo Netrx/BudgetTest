@@ -1,5 +1,4 @@
 // ===== МОДУЛЬ: ДАШБОРД =====
-import { showToast } from '../components/toast.js';
 import { DEFAULT_CATEGORIES } from '../config/constants.js';
 import { formatDateToRussian } from '../utils/dateHelpers.js';
 
@@ -21,8 +20,11 @@ function getFilteredTransactions() {
     let startDate = null;
     let endDate = null;
 
+    console.log('getFilteredTransactions - currentPeriod:', currentPeriod);
+
     switch (currentPeriod) {
         case 'all':
+            console.log('Возвращаем все транзакции:', allTransactions.length);
             return allTransactions;
         case 'year':
             startDate = new Date(now.getFullYear(), 0, 1);
@@ -37,6 +39,7 @@ function getFilteredTransactions() {
                 startDate = new Date(customStartDate);
                 endDate = new Date(customEndDate);
             } else {
+                console.log('Кастомные даты не установлены');
                 return allTransactions;
             }
             break;
@@ -47,7 +50,10 @@ function getFilteredTransactions() {
     if (startDate && endDate) {
         const startStr = startDate.toISOString().split('T')[0];
         const endStr = endDate.toISOString().split('T')[0];
-        return allTransactions.filter(t => t.date >= startStr && t.date <= endStr);
+        console.log(`Фильтр по датам: ${startStr} — ${endStr}`);
+        const filtered = allTransactions.filter(t => t.date >= startStr && t.date <= endStr);
+        console.log('Отфильтровано:', filtered.length, 'транзакций');
+        return filtered;
     }
 
     return allTransactions;
@@ -99,8 +105,13 @@ function getDaysInPeriod() {
 }
 
 function renderDashboard() {
+    console.log('renderDashboard вызван, период:', currentPeriod);
+    
     const transactions = getFilteredTransactions();
     const daysInPeriod = getDaysInPeriod();
+    
+    console.log('Транзакций для отображения:', transactions.length);
+    console.log('Дней в периоде:', daysInPeriod);
     
     const totalIncome = transactions
         .filter(t => t.type === 'income')
@@ -136,15 +147,17 @@ function renderRecentTransactions(transactions) {
     }
 
     container.innerHTML = transactions.map(t => {
-        const icon = getCategoryIcon(t.category);
-        const color = getCategoryColor(t.category);
+        const icon = getCategoryIcon(t);
+        const color = getCategoryColor(t);
         const formattedDate = formatDateToRussian(t.date);
+        const displayName = getCategoryDisplayName(t);
+        
         return `
             <div class="transaction-item">
                 <div class="left">
                     <div class="icon-box" style="color: ${color};">${icon}</div>
                     <div class="info">
-                        <div class="title" style="color: ${color};">${t.categoryName || t.category}</div>
+                        <div class="title" style="color: ${color};">${displayName}</div>
                         <div class="meta">${formattedDate} • ${t.description || 'Без описания'}</div>
                     </div>
                 </div>
@@ -154,7 +167,10 @@ function renderRecentTransactions(transactions) {
     }).join('');
 }
 
-function getCategoryIcon(categoryId) {
+function getCategoryIcon(transaction) {
+    if (!transaction) return '◻';
+    
+    const categoryId = transaction.category || transaction.categoryId;
     if (!categoryId) return '◻';
     
     const categories = storageInstance.getCategories();
@@ -172,7 +188,10 @@ function getCategoryIcon(categoryId) {
     return '◻';
 }
 
-function getCategoryColor(categoryId) {
+function getCategoryColor(transaction) {
+    if (!transaction) return '#666666';
+    
+    const categoryId = transaction.category || transaction.categoryId;
     if (!categoryId) return '#666666';
     
     const categories = storageInstance.getCategories();
@@ -182,12 +201,32 @@ function getCategoryColor(categoryId) {
         return cat.color;
     }
     
-    const defaultCat = DEFAULT_CATEGORIES.find(c => c.id === categoryId);
-    if (defaultCat && defaultCat.color) {
-        return defaultCat.color;
+    return transaction.type === 'income' ? '#000000' : '#666666';
+}
+
+function getCategoryDisplayName(transaction) {
+    if (!transaction) return 'Без категории';
+    
+    if (transaction.categoryName) {
+        return transaction.categoryName;
     }
     
-    return '#666666';
+    const categoryId = transaction.category || transaction.categoryId;
+    if (!categoryId) return 'Без категории';
+    
+    const categories = storageInstance.getCategories();
+    const cat = categories.find(c => c.id === categoryId);
+    
+    if (cat && cat.name) {
+        return cat.name;
+    }
+    
+    const defaultCat = DEFAULT_CATEGORIES.find(c => c.id === categoryId);
+    if (defaultCat && defaultCat.name) {
+        return defaultCat.name;
+    }
+    
+    return categoryId || 'Без категории';
 }
 
 function renderChart(transactions) {
@@ -197,6 +236,9 @@ function renderChart(transactions) {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    console.log('renderChart - транзакций для графика:', transactions.length);
+
+    // Группируем транзакции по датам
     const grouped = {};
     transactions.forEach(t => {
         if (!grouped[t.date]) grouped[t.date] = { income: 0, expense: 0 };
@@ -208,39 +250,99 @@ function renderChart(transactions) {
     const incomeData = dates.map(d => grouped[d].income);
     const expenseData = dates.map(d => grouped[d].expense);
 
+    console.log('Даты для графика:', dates.length);
+
+    // Уничтожаем старый график если есть
     if (chartInstance) {
         chartInstance.destroy();
         chartInstance = null;
     }
 
+    // Если нет данных, показываем сообщение
+    if (!dates.length) {
+        const parent = canvas.parentElement;
+        const oldMsg = parent.querySelector('.chart-empty-state');
+        if (oldMsg) oldMsg.remove();
+        
+        const msg = document.createElement('div');
+        msg.className = 'chart-empty-state';
+        msg.style.cssText = `
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            min-height: 200px;
+            color: var(--color-text-secondary);
+            font-size: var(--font-size-sm);
+        `;
+        msg.innerHTML = `
+            <span style="font-size: 32px; opacity: 0.3; display: block; margin-bottom: 8px;">◻</span>
+            Нет данных за выбранный период
+        `;
+        parent.appendChild(msg);
+        canvas.style.display = 'none';
+        return;
+    }
+
+    // Удаляем сообщение если есть
+    const parent = canvas.parentElement;
+    const oldMsg = parent.querySelector('.chart-empty-state');
+    if (oldMsg) oldMsg.remove();
+    canvas.style.display = 'block';
+
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
     const textColor = isDark ? '#FFFFFF' : '#000000';
     const gridColor = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
 
+    // Форматируем даты для отображения
+    const formattedLabels = dates.map(d => {
+        const date = new Date(d);
+        return `${date.getDate()}.${String(date.getMonth() + 1).padStart(2, '0')}`;
+    });
+
+    // Если дат много, показываем не все подписи
+    let maxLabels = 20;
+    let displayLabels = formattedLabels;
+    let displayIncomeData = incomeData;
+    let displayExpenseData = expenseData;
+    
+    if (dates.length > maxLabels) {
+        const step = Math.ceil(dates.length / maxLabels);
+        displayLabels = [];
+        displayIncomeData = [];
+        displayExpenseData = [];
+        for (let i = 0; i < dates.length; i += step) {
+            displayLabels.push(formattedLabels[i]);
+            displayIncomeData.push(incomeData[i]);
+            displayExpenseData.push(expenseData[i]);
+        }
+    }
+
     chartInstance = new Chart(ctx, {
         type: 'bar',
         data: {
-            labels: dates,
+            labels: displayLabels,
             datasets: [
                 {
                     label: 'Доходы',
-                    data: incomeData,
-                    backgroundColor: 'rgb(16, 185, 129)',
-                    borderColor: 'rgb(16, 185, 129)',
+                    data: displayIncomeData,
+                    backgroundColor: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)',
+                    borderColor: textColor,
                     borderWidth: 1,
-                    borderRadius: 0,
-                    barPercentage: 0.5,
-                    categoryPercentage: 0.7
+                    borderRadius: 2,
+                    barPercentage: 0.4,
+                    categoryPercentage: 0.6
                 },
                 {
                     label: 'Расходы',
-                    data: expenseData,
-                    backgroundColor: 'rgb(239, 68, 68)',
-                    borderColor: 'rgb(239, 68, 68)',
+                    data: displayExpenseData,
+                    backgroundColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)',
+                    borderColor: textColor,
                     borderWidth: 1,
-                    borderRadius: 0,
-                    barPercentage: 0.5,
-                    categoryPercentage: 0.7
+                    borderRadius: 2,
+                    barPercentage: 0.4,
+                    categoryPercentage: 0.6
                 }
             ]
         },
@@ -252,12 +354,9 @@ function renderChart(transactions) {
                     position: 'top',
                     labels: {
                         color: textColor,
-                        font: { size: 12, weight: '500' },
-                        boxWidth: 14,
-                        boxHeight: 14,
-                        padding: 16,
-                        usePointStyle: true,
-                        pointStyle: 'rect'
+                        font: { size: 11 },
+                        boxWidth: 12,
+                        padding: 12
                     }
                 }
             },
@@ -267,7 +366,10 @@ function renderChart(transactions) {
                     ticks: {
                         color: textColor,
                         font: { size: 10 },
-                        callback: value => value.toLocaleString() + ' ₽',
+                        callback: function(value) {
+                            if (value >= 1000) return (value / 1000).toFixed(0) + 'K ₽';
+                            return value + ' ₽';
+                        },
                         maxTicksLimit: 6
                     },
                     grid: {
@@ -281,7 +383,7 @@ function renderChart(transactions) {
                         font: { size: 9 },
                         maxRotation: 45,
                         autoSkip: true,
-                        maxTicksLimit: 12
+                        maxTicksLimit: 15
                     },
                     grid: {
                         display: false
@@ -289,39 +391,64 @@ function renderChart(transactions) {
                 }
             },
             animation: {
-                duration: 500
+                duration: 400
             }
         }
     });
 }
 
 function setupEventListeners() {
-    document.querySelectorAll('.period-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const period = e.currentTarget.dataset.period;
+    const periodBtns = document.querySelectorAll('.period-btn');
+    const customInputs = document.querySelector('.custom-period-inputs');
+    
+    periodBtns.forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            const period = this.dataset.period;
+            
+            console.log('Нажата кнопка периода:', period);
+            
+            // Обновляем активную кнопку
+            periodBtns.forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
 
-            document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
-            e.currentTarget.classList.add('active');
-
-            const customInputs = document.querySelector('.custom-period-inputs');
             if (period === 'custom') {
+                // Показываем поля для выбора дат
                 if (customInputs) customInputs.style.display = 'flex';
                 const now = new Date();
                 const monthAgo = new Date(now);
                 monthAgo.setMonth(monthAgo.getMonth() - 1);
                 const startInput = document.getElementById('period-start');
                 const endInput = document.getElementById('period-end');
-                if (startInput) startInput.value = monthAgo.toISOString().split('T')[0];
-                if (endInput) endInput.value = now.toISOString().split('T')[0];
-            } else {
-                if (customInputs) customInputs.style.display = 'none';
-                currentPeriod = period;
-                renderDashboard();
+                if (startInput && !startInput.value) {
+                    startInput.value = monthAgo.toISOString().split('T')[0];
+                }
+                if (endInput && !endInput.value) {
+                    endInput.value = now.toISOString().split('T')[0];
+                }
+                return;
             }
+            
+            // Скрываем кастомные поля
+            if (customInputs) customInputs.style.display = 'none';
+            
+            // Устанавливаем период и обновляем данные
+            currentPeriod = period;
+            customStartDate = null;
+            customEndDate = null;
+            
+            console.log('Применяем период:', period);
+            renderDashboard();
+            
+            const periodLabels = {
+                'all': 'Все время',
+                'year': 'Год',
+                'month': 'Месяц'
+            };
+            showToast(`Период: ${periodLabels[period] || period}`, 'success');
         });
     });
 
-    document.getElementById('apply-custom-period')?.addEventListener('click', () => {
+    document.getElementById('apply-custom-period')?.addEventListener('click', function() {
         const startInput = document.getElementById('period-start');
         const endInput = document.getElementById('period-end');
         
@@ -342,13 +469,45 @@ function setupEventListeners() {
         customEndDate = end;
         currentPeriod = 'custom';
         renderDashboard();
-        showToast(`Период: ${start} — ${end}`, 'success');
+        showToast(`Период: ${formatDateShort(start)} — ${formatDateShort(end)}`, 'success');
     });
 
-    document.addEventListener('transaction-added', renderDashboard);
-    document.addEventListener('transaction-deleted', renderDashboard);
+    // Слушаем события изменения данных
+    document.addEventListener('transaction-added', () => {
+        console.log('Событие transaction-added');
+        renderDashboard();
+    });
+    document.addEventListener('transaction-deleted', () => {
+        console.log('Событие transaction-deleted');
+        renderDashboard();
+    });
     document.addEventListener('theme-changed', () => {
+        console.log('Событие theme-changed');
         const transactions = getFilteredTransactions();
         renderChart(transactions);
     });
+}
+
+function getPeriodLabel(period) {
+    const labels = {
+        'all': 'Все время',
+        'year': 'Год',
+        'month': 'Месяц',
+        'custom': 'Выбранный'
+    };
+    return labels[period] || period;
+}
+
+function formatDateShort(dateString) {
+    if (!dateString) return '';
+    const parts = dateString.split('-');
+    return `${parts[2]}.${parts[1]}.${parts[0]}`;
+}
+
+function showToast(message, type = 'info') {
+    if (window.showToast) {
+        window.showToast(message, type);
+    } else {
+        console.log('[Toast]', message);
+    }
 }

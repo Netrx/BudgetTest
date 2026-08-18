@@ -32,11 +32,24 @@ function setupEventListeners() {
     document.getElementById('currency')?.addEventListener('change', (e) => {
         storageInstance.updateSettings({ currency: e.target.value });
         showToast('Валюта обновлена', 'success');
-        window.app.refreshHeader();
+        if (window.app && window.app.refreshHeader) {
+            window.app.refreshHeader();
+        }
     });
     
     document.getElementById('theme-toggle')?.addEventListener('change', (e) => {
-        window.app.toggleTheme();
+        if (window.app && window.app.toggleTheme) {
+            window.app.toggleTheme();
+        } else {
+            // Fallback
+            const html = document.documentElement;
+            const current = html.getAttribute('data-theme');
+            const next = current === 'dark' ? 'light' : 'dark';
+            html.setAttribute('data-theme', next);
+            storageInstance.updateSettings({ theme: next });
+            showToast(`${next === 'dark' ? 'Темная' : 'Светлая'} тема`, 'success');
+            document.dispatchEvent(new Event('theme-changed'));
+        }
     });
     
     document.getElementById('export-data')?.addEventListener('click', exportData);
@@ -68,7 +81,9 @@ function importData(event) {
             if (data.transactions && data.categories) {
                 storageInstance.saveData(data);
                 showToast('Данные импортированы', 'success');
-                window.app.refreshHeader();
+                if (window.app && window.app.refreshHeader) {
+                    window.app.refreshHeader();
+                }
                 location.reload();
             } else {
                 showToast('Неверный формат файла', 'error');

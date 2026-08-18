@@ -4,52 +4,18 @@ import { showToast } from '../components/toast.js';
 
 let storageInstance = null;
 let charts = {};
-let selectedCategories = ['all'];
-let selectedSubcategories = [];
 let pieFilters = {
-    period: 'month',
+    period: 'custom',
+    category: 'all',
     dateStart: null,
     dateEnd: null
-};
-
-// Данные о подкатегориях для каждой родительской категории
-const subcategoryData = {
-    food: ['food_home', 'food_cafe', 'food_delivery'],
-    transport: ['transport_bus', 'transport_taxi', 'transport_fuel', 'transport_maintenance'],
-    entertainment: ['entertainment_movies', 'entertainment_games', 'entertainment_hobbies'],
-    shopping: ['shopping_clothes', 'shopping_electronics', 'shopping_home'],
-    bills: ['bills_utilities', 'bills_internet', 'bills_phone'],
-    health: ['health_pharmacy', 'health_doctors']
-};
-
-// Названия и иконки для подкатегорий
-const subcategoryNames = {
-    food_home: { icon: '◻', name: 'Домашняя еда', color: '#F59E0B' },
-    food_cafe: { icon: '★', name: 'Кафе и рестораны', color: '#F43F5E' },
-    food_delivery: { icon: '⊞', name: 'Доставка', color: '#F97316' },
-    transport_bus: { icon: '◆', name: 'Общественный', color: '#F59E0B' },
-    transport_taxi: { icon: '◇', name: 'Такси', color: '#EAB308' },
-    transport_fuel: { icon: '●', name: 'Топливо', color: '#F97316' },
-    transport_maintenance: { icon: '▣', name: 'Обслуживание', color: '#EF4444' },
-    entertainment_movies: { icon: '☆', name: 'Кино', color: '#EC4899' },
-    entertainment_games: { icon: '✦', name: 'Игры', color: '#D946EF' },
-    entertainment_hobbies: { icon: '◻', name: 'Хобби', color: '#A855F7' },
-    shopping_clothes: { icon: '●', name: 'Одежда', color: '#F97316' },
-    shopping_electronics: { icon: '▣', name: 'Электроника', color: '#F59E0B' },
-    shopping_home: { icon: '▦', name: 'Для дома', color: '#EAB308' },
-    bills_utilities: { icon: '▦', name: 'Коммунальные', color: '#06B6D4' },
-    bills_internet: { icon: '⊞', name: 'Интернет', color: '#3B82F6' },
-    bills_phone: { icon: '◆', name: 'Телефон', color: '#6366F1' },
-    health_pharmacy: { icon: '▲', name: 'Аптека', color: '#22C55E' },
-    health_doctors: { icon: '△', name: 'Врачи', color: '#10B981' }
 };
 
 export function init(storage) {
     storageInstance = storage;
     renderReports();
     setupEventListeners();
-    setupCategoryButtons();
-    setupClearFiltersButton();
+    populateCategoryFilters();
     
     // Инициализация дат при загрузке
     const now = new Date();
@@ -65,213 +31,6 @@ export function init(storage) {
     }
     pieFilters.dateStart = dateStart?.value || null;
     pieFilters.dateEnd = dateEnd?.value || null;
-}
-
-function setupClearFiltersButton() {
-    const clearBtn = document.getElementById('clear-filters-btn');
-    if (!clearBtn) return;
-    
-    clearBtn.addEventListener('click', function() {
-        // Сбрасываем выбранные категории
-        selectedCategories = ['all'];
-        selectedSubcategories = [];
-        
-        // Сбрасываем активные состояния кнопок категорий
-        document.querySelectorAll('.category-filter-btn.main-cat').forEach(b => {
-            b.classList.remove('active');
-            b.style.background = 'transparent';
-            b.style.border = '1px solid var(--color-border)';
-            b.style.color = b.dataset.color || '#666666';
-        });
-        
-        // Активируем кнопку "Все"
-        const allBtn = document.querySelector('.category-filter-btn[data-category="all"]');
-        if (allBtn) {
-            allBtn.classList.add('active');
-            allBtn.style.background = 'var(--color-text)';
-            allBtn.style.color = 'var(--color-bg)';
-            allBtn.style.border = '1px solid var(--color-text)';
-        }
-        
-        // Очищаем подкатегории
-        document.getElementById('subcategories-container').innerHTML = '';
-        
-        // Сбрасываем период на "Месяц"
-        document.querySelectorAll('.period-btn-pie').forEach(b => {
-            b.classList.remove('active');
-            b.style.background = 'transparent';
-            b.style.color = 'var(--color-text-secondary)';
-        });
-        const monthBtn = document.querySelector('.period-btn-pie[data-period="month"]');
-        if (monthBtn) {
-            monthBtn.classList.add('active');
-            monthBtn.style.background = 'var(--color-text)';
-            monthBtn.style.color = 'var(--color-bg)';
-        }
-        pieFilters.period = 'month';
-        pieFilters.dateStart = null;
-        pieFilters.dateEnd = null;
-        
-        // Скрываем кастомные даты
-        document.getElementById('pie-custom-dates').style.display = 'none';
-        
-        // Обновляем графики
-        renderReports();
-        showToast('Фильтры очищены', 'success');
-    });
-}
-
-function setupCategoryButtons() {
-    // Обработчики для основных категорий
-    document.querySelectorAll('.category-filter-btn.main-cat').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const category = this.dataset.category;
-            
-            // Если выбрана категория
-            if (category !== 'all') {
-                // Убираем "Все" если оно было выбрано
-                const allBtn = document.querySelector('.category-filter-btn[data-category="all"]');
-                if (selectedCategories.includes('all')) {
-                    selectedCategories = selectedCategories.filter(c => c !== 'all');
-                    allBtn.classList.remove('active');
-                    allBtn.style.background = 'transparent';
-                    allBtn.style.color = 'var(--color-text-secondary)';
-                    allBtn.style.border = '1px solid var(--color-border)';
-                }
-                
-                // Переключаем категорию
-                const index = selectedCategories.indexOf(category);
-                if (index === -1) {
-                    selectedCategories.push(category);
-                    this.classList.add('active');
-                    this.style.background = 'var(--color-text)';
-                    this.style.color = 'var(--color-bg)';
-                    this.style.border = '1px solid var(--color-text)';
-                } else {
-                    selectedCategories.splice(index, 1);
-                    this.classList.remove('active');
-                    this.style.background = 'transparent';
-                    this.style.color = this.dataset.color || '#666666';
-                    this.style.border = '1px solid var(--color-border)';
-                }
-                
-                // Если не осталось выбранных категорий - выбираем "Все"
-                if (selectedCategories.length === 0) {
-                    selectedCategories = ['all'];
-                    const allBtn2 = document.querySelector('.category-filter-btn[data-category="all"]');
-                    if (allBtn2) {
-                        allBtn2.classList.add('active');
-                        allBtn2.style.background = 'var(--color-text)';
-                        allBtn2.style.color = 'var(--color-bg)';
-                        allBtn2.style.border = '1px solid var(--color-text)';
-                    }
-                }
-            } else {
-                // Выбрано "Все"
-                selectedCategories = ['all'];
-                selectedSubcategories = [];
-                document.querySelectorAll('.category-filter-btn.main-cat').forEach(b => {
-                    b.classList.remove('active');
-                    b.style.background = 'transparent';
-                    b.style.border = '1px solid var(--color-border)';
-                    b.style.color = b.dataset.color || '#666666';
-                });
-                this.classList.add('active');
-                this.style.background = 'var(--color-text)';
-                this.style.color = 'var(--color-bg)';
-                this.style.border = '1px solid var(--color-text)';
-                
-                // Очищаем подкатегории
-                document.getElementById('subcategories-container').innerHTML = '';
-                selectedSubcategories = [];
-            }
-            
-            // Обновляем отображение подкатегорий
-            renderSubcategories();
-            
-            // Обновляем графики
-            renderReports();
-        });
-    });
-    
-    // Обработчики для подкатегорий (добавляются динамически)
-    document.addEventListener('click', function(e) {
-        if (e.target.classList.contains('category-filter-btn') && e.target.classList.contains('sub-cat')) {
-            const btn = e.target;
-            const subcategory = btn.dataset.category;
-            
-            // Переключаем подкатегорию
-            const index = selectedSubcategories.indexOf(subcategory);
-            if (index === -1) {
-                selectedSubcategories.push(subcategory);
-                btn.classList.add('active');
-                btn.style.background = 'var(--color-text)';
-                btn.style.color = 'var(--color-bg)';
-                btn.style.border = '1px solid var(--color-text)';
-            } else {
-                selectedSubcategories.splice(index, 1);
-                btn.classList.remove('active');
-                btn.style.background = 'transparent';
-                btn.style.border = '1px solid var(--color-border)';
-                btn.style.color = btn.dataset.color || '#666666';
-            }
-            
-            renderReports();
-        }
-    });
-    
-    // Кнопка "Все"
-    document.querySelector('.category-filter-btn[data-category="all"]')?.addEventListener('click', function() {
-        // Обработка уже есть выше
-    });
-}
-
-function renderSubcategories() {
-    const container = document.getElementById('subcategories-container');
-    if (!container) return;
-    
-    // Показываем подкатегории только для выбранных основных категорий
-    const activeMainCategories = selectedCategories.filter(c => c !== 'all');
-    
-    if (activeMainCategories.length === 0) {
-        container.innerHTML = '';
-        return;
-    }
-    
-    let html = '';
-    activeMainCategories.forEach(catId => {
-        const subIds = subcategoryData[catId] || [];
-        if (subIds.length === 0) return;
-        
-        const mainCat = document.querySelector(`.main-cat[data-category="${catId}"]`);
-        const catName = mainCat ? mainCat.textContent : catId;
-        const catColor = mainCat ? mainCat.dataset.color || '#666666' : '#666666';
-        
-        html += `
-            <div style="display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; align-items: center; padding: 6px 10px; background: var(--color-bg-secondary); border-radius: var(--radius-sm); border: 1px dashed ${catColor}; width: 100%; box-sizing: border-box;">
-                <span style="font-size: var(--font-size-xs); color: ${catColor}; font-weight: 600; padding: 2px 8px; width: 100%; text-align: center;">${catName}</span>
-                ${subIds.map(id => {
-                    const info = subcategoryNames[id] || { icon: '◻', name: id, color: '#666666' };
-                    const isActive = selectedSubcategories.includes(id);
-                    return `
-                        <button class="category-filter-btn sub-cat ${isActive ? 'active' : ''}" 
-                                data-category="${id}" 
-                                data-color="${info.color}"
-                                style="padding: 4px 10px; border: 1px solid ${isActive ? 'var(--color-text)' : 'var(--color-border)'}; 
-                                       background: ${isActive ? 'var(--color-text)' : 'transparent'}; 
-                                       color: ${isActive ? 'var(--color-bg)' : info.color}; 
-                                       border-radius: var(--radius-sm); font-family: var(--font-family); 
-                                       font-size: var(--font-size-xs); font-weight: 500; cursor: pointer; 
-                                       transition: var(--transition); white-space: nowrap;">
-                            ${info.icon} ${info.name}
-                        </button>
-                    `;
-                }).join('')}
-            </div>
-        `;
-    });
-    
-    container.innerHTML = html;
 }
 
 function getFilteredPieTransactions() {
@@ -311,6 +70,18 @@ function getFilteredPieTransactions() {
         transactions = transactions.filter(t => t.date >= startStr && t.date <= endStr);
     }
     
+    // Фильтр по категории
+    if (pieFilters.category !== 'all') {
+        const category = storageInstance.getCategory(pieFilters.category);
+        if (category) {
+            const subCategories = storageInstance.getSubCategories(category.id);
+            const categoryIds = [category.id, ...subCategories.map(c => c.id)];
+            transactions = transactions.filter(t => categoryIds.includes(t.category));
+        } else {
+            transactions = transactions.filter(t => t.category === pieFilters.category);
+        }
+    }
+    
     return transactions;
 }
 
@@ -318,13 +89,86 @@ function getAllTransactions() {
     return storageInstance.getTransactions();
 }
 
+function populateCategoryFilters() {
+    const container = document.getElementById('category-filter-buttons');
+    if (!container) return;
+    
+    const categories = storageInstance.getCategories();
+    const expenseCategories = categories.filter(c => c.type === 'expense');
+    const mainCategories = expenseCategories.filter(c => !c.parentId);
+    
+    // Получаем все транзакции для проверки наличия данных
+    const allTransactions = storageInstance.getTransactions();
+    
+    // Собираем категории, которые имеют транзакции
+    const categoriesWithTransactions = new Set();
+    allTransactions
+        .filter(t => t.type === 'expense')
+        .forEach(t => {
+            if (t.category) {
+                categoriesWithTransactions.add(t.category);
+            }
+        });
+    
+    let html = `
+        <button class="category-filter-btn active" data-category="all" style="padding: 4px 10px; border: 1px solid var(--color-text); background: var(--color-text); color: var(--color-bg); border-radius: var(--radius-sm); font-family: var(--font-family); font-size: var(--font-size-xs); font-weight: 500; cursor: pointer; transition: var(--transition); white-space: nowrap;">Все</button>
+    `;
+    
+    mainCategories.forEach(cat => {
+        // Проверяем, есть ли транзакции у этой категории или её подкатегорий
+        const subCats = expenseCategories.filter(c => c.parentId === cat.id);
+        const hasTransactions = categoriesWithTransactions.has(cat.id) || 
+            subCats.some(sub => categoriesWithTransactions.has(sub.id));
+        
+        // Показываем только категории с транзакциями
+        if (hasTransactions) {
+            const color = cat.color || '#666666';
+            html += `
+                <button class="category-filter-btn main-cat" data-category="${cat.id}" data-color="${color}" style="padding: 4px 10px; border: 1px solid var(--color-border); background: transparent; color: ${color}; border-radius: var(--radius-sm); font-family: var(--font-family); font-size: var(--font-size-xs); font-weight: 500; cursor: pointer; transition: var(--transition); white-space: nowrap;">${cat.icon} ${cat.name}</button>
+            `;
+        }
+    });
+    
+    container.innerHTML = html;
+    
+    // Добавляем обработчики для кнопок фильтрации категорий
+    document.querySelectorAll('.category-filter-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            document.querySelectorAll('.category-filter-btn').forEach(b => {
+                b.classList.remove('active');
+                b.style.border = '1px solid var(--color-border)';
+                b.style.background = 'transparent';
+                b.style.color = b.dataset.color || 'var(--color-text-secondary)';
+            });
+            
+            this.classList.add('active');
+            this.style.border = '1px solid var(--color-text)';
+            this.style.background = 'var(--color-text)';
+            this.style.color = 'var(--color-bg)';
+            
+            const category = this.dataset.category;
+            pieFilters.category = category;
+            
+            // Обновляем select
+            const select = document.getElementById('report-pie-category');
+            if (select) {
+                select.value = category;
+            }
+            
+            renderReports();
+            showToast('Фильтр применен', 'success');
+        });
+    });
+}
+
 function renderReports() {
+    const pieTransactions = getFilteredPieTransactions();
     const allTransactions = getAllTransactions();
     const categories = storageInstance.getCategories();
     
     renderCategoryStats(allTransactions, categories);
     renderMonthlyChart(allTransactions);
-    renderExpensePieCharts(allTransactions, categories);
+    renderExpensePieChart(pieTransactions, categories);
 }
 
 function renderCategoryStats(transactions, categories) {
@@ -409,7 +253,7 @@ function renderCategoryStats(transactions, categories) {
                             const childColor = child.color || '#666666';
                             return `
                                 <div class="category-stat sub-stat" style="padding: 4px 0; animation: fadeIn 0.2s ease; display: flex; align-items: center; gap: var(--spacing-sm);">
-                                    <span class="name" style="color: ${childColor}; font-size: var(--font-size-xs); flex: 1; min-width: 80px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${child.icon} ${child.name}</span>
+                                    <span class="name" style="color: ${childColor}; font-size: var(--font-size-xs); flex: 1; min-width: 80px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${child.name}</span>
                                     <div class="bar-track" style="flex: 1; height: 4px; background: var(--color-bg-secondary); border-radius: var(--radius-sm); overflow: hidden;">
                                         <div class="bar-fill" style="width: ${Math.min(childPercentage, 100)}%; background: ${childColor}; height: 100%; border-radius: var(--radius-sm);"></div>
                                     </div>
@@ -605,123 +449,68 @@ function renderMonthlyChart(transactions) {
     });
 }
 
-function renderExpensePieCharts(transactions, categories) {
-    // Получаем все расходы
-    const expenseTransactions = transactions.filter(t => t.type === 'expense');
-    
-    // 1. ГРАФИК ПО КАТЕГОРИЯМ (СЛЕВА)
-    // Если выбрано "Все" или ничего не выбрано - показываем все категории
-    // Если выбраны конкретные категории - показываем только их
-    let categoryFilter = null;
-    if (!selectedCategories.includes('all') && selectedCategories.length > 0) {
-        categoryFilter = selectedCategories;
-    }
-    // Если selectedCategories содержит 'all' или пусто - categoryFilter остается null (показываем все)
-    
-    renderPieChart(
-        'expense-pie-chart',
-        expenseTransactions,
-        categories,
-        categoryFilter,
-        'category'
-    );
-    
-    // 2. ГРАФИК ПО ПОДКАТЕГОРИЯМ (СПРАВА)
-    // Показываем только выбранные подкатегории
-    let subcategoryFilter = null;
-    if (selectedSubcategories.length > 0) {
-        subcategoryFilter = selectedSubcategories;
-    }
-    // Если подкатегории не выбраны - показываем все подкатегории выбранных категорий или все
-    
-    renderPieChart(
-        'subcategory-pie-chart',
-        expenseTransactions,
-        categories,
-        subcategoryFilter,
-        'subcategory'
-    );
-}
-
-function renderPieChart(canvasId, transactions, categories, filter, type) {
-    const canvas = document.getElementById(canvasId);
+function renderExpensePieChart(transactions, categories) {
+    const canvas = document.getElementById('expense-pie-chart');
     if (!canvas) return;
     
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     
-    // Удаляем старый график
-    if (charts[canvasId]) {
-        charts[canvasId].destroy();
-        charts[canvasId] = null;
-    }
-    
-    // Группируем данные
-    const dataByCategory = {};
+    const expenseByCategory = {};
     let hasData = false;
     
-    transactions.forEach(t => {
-        const catId = t.category;
-        const category = categories.find(c => c.id === catId);
-        
-        // Для графика по категориям - показываем только основные категории (без parentId)
-        if (type === 'category') {
-            if (!category || category.parentId) return;
-            
-            // Применяем фильтр для категорий (если он есть)
-            if (filter !== null && filter !== undefined && filter.length > 0) {
-                if (!filter.includes(catId)) return;
+    transactions
+        .filter(t => t.type === 'expense')
+        .forEach(t => {
+            hasData = true;
+            const catId = t.category;
+            if (!expenseByCategory[catId]) {
+                const category = categories.find(c => c.id === catId);
+                expenseByCategory[catId] = {
+                    name: category ? category.name : t.categoryName || catId,
+                    color: category ? category.color : '#666666',
+                    total: 0
+                };
             }
-            // Если filter === null или пустой массив - показываем все категории
-        }
-        
-        // Для графика по подкатегориям
-        if (type === 'subcategory') {
-            if (!category || !category.parentId) return;
-            
-            // Применяем фильтр для подкатегорий (если он есть)
-            if (filter !== null && filter !== undefined && filter.length > 0) {
-                if (!filter.includes(catId)) return;
-            }
-            // Если filter === null или пустой массив - показываем все подкатегории
-        }
-        
-        hasData = true;
-        if (!dataByCategory[catId]) {
-            dataByCategory[catId] = {
-                name: category ? category.name : t.categoryName || catId,
-                icon: category ? category.icon : '◻',
-                color: category ? category.color : '#666666',
-                total: 0
-            };
-        }
-        dataByCategory[catId].total += t.amount;
-    });
+            expenseByCategory[catId].total += t.amount;
+        });
     
-    const items = Object.values(dataByCategory).filter(item => item.total > 0);
-    const labels = items.map(item => `${item.icon} ${item.name}`);
+    const items = Object.values(expenseByCategory).filter(item => item.total > 0);
+    
+    // Сортируем по убыванию суммы
+    items.sort((a, b) => b.total - a.total);
+    
+    // Только названия категорий (без иконок)
+    const labels = items.map(item => item.name);
     const data = items.map(item => item.total);
     const colors = items.map(item => item.color || '#666666');
     
-    // Удаляем сообщение "Нет данных" если оно есть
-    const parent = canvas.parentElement;
-    const existingMsg = parent.querySelector('.empty-state');
-    if (existingMsg) existingMsg.remove();
+    if (charts.pie) {
+        charts.pie.destroy();
+        charts.pie = null;
+    }
     
     if (!hasData || !data.length) {
-        const msg = document.createElement('div');
-        msg.className = 'empty-state';
-        msg.innerHTML = '<span class="icon">◻</span>Нет данных';
-        parent.appendChild(msg);
+        const parent = canvas.parentElement;
+        const existing = parent.querySelector('.empty-state');
+        if (!existing) {
+            const msg = document.createElement('div');
+            msg.className = 'empty-state';
+            msg.innerHTML = '<span class="icon">◻</span>Нет данных о расходах';
+            parent.appendChild(msg);
+        }
         canvas.style.display = 'none';
         return;
     }
     
     canvas.style.display = 'block';
+    const parent = canvas.parentElement;
+    const existing = parent.querySelector('.empty-state');
+    if (existing) existing.remove();
     
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
     
-    charts[canvasId] = new Chart(ctx, {
+    charts.pie = new Chart(ctx, {
         type: 'doughnut',
         data: {
             labels: labels,
@@ -743,10 +532,18 @@ function renderPieChart(canvasId, transactions, categories, filter, type) {
                     labels: {
                         padding: 14,
                         color: isDark ? '#FFFFFF' : '#000000',
-                        font: { size: 10, weight: '400' },
-                        boxWidth: 12,
-                        usePointStyle: true,
-                        pointStyle: 'circle'
+                        font: { size: 11, weight: '400' },
+                        boxWidth: 0,
+                        usePointStyle: false,
+                        generateLabels: function(chart) {
+                            const data = chart.data;
+                            return data.labels.map((label, i) => ({
+                                text: label,
+                                fillStyle: data.datasets[0].backgroundColor[i],
+                                strokeStyle: data.datasets[0].backgroundColor[i],
+                                index: i
+                            }));
+                        }
                     }
                 }
             },
@@ -754,7 +551,26 @@ function renderPieChart(canvasId, transactions, categories, filter, type) {
                 duration: 600,
                 easing: 'easeOutQuart'
             }
-        }
+        },
+        plugins: [{
+            id: 'customLegendColors',
+            afterDraw: function(chart) {
+                const legendItems = chart.legend.legendItems;
+                if (legendItems) {
+                    legendItems.forEach((item, i) => {
+                        const li = chart.legend.legendItems[i];
+                        if (li && li.text) {
+                            const color = colors[i] || '#666666';
+                            const legendItem = document.querySelectorAll('.chartjs-legend li span')[i];
+                            if (legendItem) {
+                                legendItem.style.color = color;
+                                legendItem.style.fontWeight = '500';
+                            }
+                        }
+                    });
+                }
+            }
+        }]
     });
 }
 
@@ -763,19 +579,14 @@ function setupEventListeners() {
     const dateStart = document.getElementById('report-pie-date-start');
     const dateEnd = document.getElementById('report-pie-date-end');
     const applyDatesBtn = document.getElementById('apply-pie-dates');
+    const applyFiltersBtn = document.getElementById('apply-pie-filters');
+    const categorySelect = document.getElementById('report-pie-category');
     
     // Обработчики для кнопок периода
     document.querySelectorAll('.period-btn-pie').forEach(btn => {
         btn.addEventListener('click', function() {
-            document.querySelectorAll('.period-btn-pie').forEach(b => {
-                b.classList.remove('active');
-                b.style.background = 'transparent';
-                b.style.color = 'var(--color-text-secondary)';
-            });
-            
+            document.querySelectorAll('.period-btn-pie').forEach(b => b.classList.remove('active'));
             this.classList.add('active');
-            this.style.background = 'var(--color-text)';
-            this.style.color = 'var(--color-bg)';
             
             const period = this.dataset.period;
             
@@ -789,15 +600,14 @@ function setupEventListeners() {
                 pieFilters.period = 'custom';
                 pieFilters.dateStart = dateStart.value;
                 pieFilters.dateEnd = dateEnd.value;
+                applyFiltersBtn.click();
             } else {
                 pieCustomDates.style.display = 'none';
                 pieFilters.period = period;
                 pieFilters.dateStart = null;
                 pieFilters.dateEnd = null;
+                applyFiltersBtn.click();
             }
-            
-            renderReports();
-            showToast(`Период: ${this.textContent}`, 'success');
         });
     });
     
@@ -814,15 +624,48 @@ function setupEventListeners() {
         pieFilters.dateStart = dateStart.value;
         pieFilters.dateEnd = dateEnd.value;
         pieFilters.period = 'custom';
+        applyFiltersBtn.click();
+    });
+    
+    // Применить все фильтры
+    applyFiltersBtn?.addEventListener('click', () => {
+        pieFilters.category = categorySelect.value || 'all';
+        
+        // Синхронизируем кнопки с select
+        document.querySelectorAll('.category-filter-btn').forEach(btn => {
+            if (btn.dataset.category === pieFilters.category) {
+                btn.click();
+            }
+        });
+        
+        if (pieFilters.period === 'custom' && (!pieFilters.dateStart || !pieFilters.dateEnd)) {
+            const now = new Date();
+            const monthAgo = new Date(now);
+            monthAgo.setMonth(monthAgo.getMonth() - 1);
+            pieFilters.dateStart = monthAgo.toISOString().split('T')[0];
+            pieFilters.dateEnd = now.toISOString().split('T')[0];
+        }
         
         renderReports();
-        showToast(`Период: ${dateStart.value} — ${dateEnd.value}`, 'success');
+        showToast('График обновлен', 'success');
+    });
+    
+    // Синхронизация select с кнопками
+    categorySelect?.addEventListener('change', function() {
+        const value = this.value;
+        document.querySelectorAll('.category-filter-btn').forEach(btn => {
+            if (btn.dataset.category === value) {
+                btn.click();
+            }
+        });
     });
     
     document.addEventListener('transaction-added', () => {
+        populateCategoryFilters();
         renderReports();
     });
     document.addEventListener('transaction-deleted', () => {
+        populateCategoryFilters();
         renderReports();
     });
     document.addEventListener('theme-changed', () => {

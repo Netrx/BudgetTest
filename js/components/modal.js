@@ -71,37 +71,70 @@ export function openModal(title, content, onSubmit) {
         if (form) {
             form.addEventListener('submit', (e) => {
                 e.preventDefault();
+                
+                // Собираем данные из формы, включая файлы
                 const formData = new FormData(form);
-                const data = Object.fromEntries(formData.entries());
+                const data = {};
                 
-                const errorEl = modal.querySelector('.modal-error');
-                if (errorEl) errorEl.remove();
+                // Обрабатываем все поля формы
+                for (let [key, value] of formData.entries()) {
+                    // Пропускаем пустые файлы
+                    if (key === 'photo' && value instanceof File && value.size === 0) continue;
+                    data[key] = value;
+                }
                 
-                try {
-                    onSubmit(data);
-                    closeModal();
-                } catch (error) {
-                    console.error('Ошибка при сохранении:', error);
-                    
-                    const errorDiv = document.createElement('div');
-                    errorDiv.className = 'modal-error';
-                    errorDiv.style.cssText = `
-                        color: #EF4444;
-                        font-size: 12px;
-                        margin-top: 12px;
-                        padding: 8px 12px;
-                        background: rgba(239, 68, 68, 0.1);
-                        border-radius: var(--radius-sm);
-                        border: 1px solid rgba(239, 68, 68, 0.2);
-                    `;
-                    errorDiv.textContent = 'Ошибка при сохранении. Проверьте введенные данные.';
-                    
-                    const body = modal.querySelector('.modal-body');
-                    if (body) {
-                        body.appendChild(errorDiv);
+                // Если есть файл фото, конвертируем его в base64
+                const photoFile = formData.get('photo');
+                if (photoFile && photoFile instanceof File && photoFile.size > 0) {
+                    const reader = new FileReader();
+                    reader.onload = function(event) {
+                        data.photo = event.target.result;
+                        submitData(data);
+                    };
+                    reader.readAsDataURL(photoFile);
+                    return;
+                }
+                
+                // Если есть скрытое поле с photo (base64)
+                if (data.photo === undefined) {
+                    const hiddenPhoto = form.querySelector('#photo-hidden');
+                    if (hiddenPhoto) {
+                        data.photo = hiddenPhoto.value || '';
                     }
                 }
+                
+                submitData(data);
             });
+        }
+    }
+    
+    function submitData(data) {
+        const errorEl = modal.querySelector('.modal-error');
+        if (errorEl) errorEl.remove();
+        
+        try {
+            onSubmit(data);
+            closeModal();
+        } catch (error) {
+            console.error('Ошибка при сохранении:', error);
+            
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'modal-error';
+            errorDiv.style.cssText = `
+                color: #EF4444;
+                font-size: 12px;
+                margin-top: 12px;
+                padding: 8px 12px;
+                background: rgba(239, 68, 68, 0.1);
+                border-radius: var(--radius-sm);
+                border: 1px solid rgba(239, 68, 68, 0.2);
+            `;
+            errorDiv.textContent = 'Ошибка при сохранении. Проверьте введенные данные.';
+            
+            const body = modal.querySelector('.modal-body');
+            if (body) {
+                body.appendChild(errorDiv);
+            }
         }
     }
     

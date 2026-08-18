@@ -24,71 +24,37 @@
         <!-- Распределение расходов -->
         <div class="report-card full-width">
             <h3>Распределение расходов</h3>
-            
-            <!-- Два графика в ряд -->
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacing-lg); margin-bottom: var(--spacing-lg);">
-                <div>
-                    <h4 style="font-size: var(--font-size-sm); color: var(--color-text-secondary); text-align: center; margin-bottom: var(--spacing-sm);">По категориям</h4>
-                    <div class="chart-container">
-                        <canvas id="expense-pie-chart"></canvas>
-                    </div>
-                </div>
-                <div>
-                    <h4 style="font-size: var(--font-size-sm); color: var(--color-text-secondary); text-align: center; margin-bottom: var(--spacing-sm);">По подкатегориям</h4>
-                    <div class="chart-container">
-                        <canvas id="subcategory-pie-chart"></canvas>
-                    </div>
-                </div>
+            <div class="chart-container">
+                <canvas id="expense-pie-chart"></canvas>
             </div>
-            
-            <!-- Фильтры -->
-            <div style="margin-top: var(--spacing-md); padding-top: var(--spacing-md); border-top: 1px solid var(--color-border);">
-                <div style="display: flex; flex-direction: column; gap: var(--spacing-md); align-items: stretch; width: 100%; max-width: 900px; margin: 0 auto;">
+            <!-- Фильтры внизу -->
+            <div style="margin-top: var(--spacing-lg); padding-top: var(--spacing-md); border-top: 1px solid var(--color-border);">
+                <div style="display: flex; flex-direction: column; gap: var(--spacing-md); align-items: center;">
                     
                     <!-- Период -->
-                    <div class="period-selector" style="display: flex; gap: 4px; background: var(--color-bg-secondary); padding: 4px; border-radius: var(--radius-sm); border: 1px solid var(--color-border); width: 100%;">
-                        <button class="period-btn-pie" data-period="all" style="flex: 1; padding: 6px 8px; border: none; background: transparent; color: var(--color-text-secondary); font-size: var(--font-size-xs); font-weight: 500; border-radius: var(--radius-sm); cursor: pointer; transition: var(--transition); font-family: var(--font-family); text-align: center;">Все</button>
-                        <button class="period-btn-pie" data-period="year" style="flex: 1; padding: 6px 8px; border: none; background: transparent; color: var(--color-text-secondary); font-size: var(--font-size-xs); font-weight: 500; border-radius: var(--radius-sm); cursor: pointer; transition: var(--transition); font-family: var(--font-family); text-align: center;">Год</button>
-                        <button class="period-btn-pie active" data-period="month" style="flex: 1; padding: 6px 8px; border: none; background: var(--color-text); color: var(--color-bg); font-size: var(--font-size-xs); font-weight: 500; border-radius: var(--radius-sm); cursor: pointer; transition: var(--transition); font-family: var(--font-family); text-align: center;">Месяц</button>
-                        <button class="period-btn-pie" data-period="custom" style="flex: 1; padding: 6px 8px; border: none; background: transparent; color: var(--color-text-secondary); font-size: var(--font-size-xs); font-weight: 500; border-radius: var(--radius-sm); cursor: pointer; transition: var(--transition); font-family: var(--font-family); text-align: center;">Выбрать</button>
+                    <div class="period-selector" style="display: flex; gap: 4px; background: var(--color-bg-secondary); padding: 4px; border-radius: var(--radius-sm); border: 1px solid var(--color-border);">
+                        <button class="period-btn-pie" data-period="all" style="padding: 6px 14px; border: none; background: transparent; color: var(--color-text-secondary); font-size: var(--font-size-xs); font-weight: 500; border-radius: var(--radius-sm); cursor: pointer; transition: var(--transition); font-family: var(--font-family);">Все</button>
+                        <button class="period-btn-pie" data-period="year" style="padding: 6px 14px; border: none; background: transparent; color: var(--color-text-secondary); font-size: var(--font-size-xs); font-weight: 500; border-radius: var(--radius-sm); cursor: pointer; transition: var(--transition); font-family: var(--font-family);">Год</button>
+                        <button class="period-btn-pie" data-period="month" style="padding: 6px 14px; border: none; background: transparent; color: var(--color-text-secondary); font-size: var(--font-size-xs); font-weight: 500; border-radius: var(--radius-sm); cursor: pointer; transition: var(--transition); font-family: var(--font-family);">Месяц</button>
+                        <button class="period-btn-pie active" data-period="custom" style="padding: 6px 14px; border: none; background: transparent; color: var(--color-text-secondary); font-size: var(--font-size-xs); font-weight: 500; border-radius: var(--radius-sm); cursor: pointer; transition: var(--transition); font-family: var(--font-family);">Выбрать</button>
                     </div>
                     
                     <!-- Поля для выбора дат -->
-                    <div id="pie-custom-dates" style="display: none; flex-direction: column; align-items: stretch; gap: var(--spacing-sm); width: 100%;">
-                        <div style="display: flex; align-items: center; gap: var(--spacing-sm); background: var(--color-bg-secondary); padding: 6px 12px; border-radius: var(--radius-sm); border: 1px solid var(--color-border); width: 100%; box-sizing: border-box;">
-                            <input type="date" id="report-pie-date-start" style="flex: 1; padding: 6px 8px; border: none; background: transparent; color: var(--color-text); font-family: var(--font-family); font-size: var(--font-size-xs); min-width: 0; outline: none; width: 100%;">
-                            <span style="color: var(--color-text-secondary); font-size: var(--font-size-sm); font-weight: 500; padding: 0 4px; flex-shrink: 0;">—</span>
-                            <input type="date" id="report-pie-date-end" style="flex: 1; padding: 6px 8px; border: none; background: transparent; color: var(--color-text); font-family: var(--font-family); font-size: var(--font-size-xs); min-width: 0; outline: none; width: 100%;">
+                    <div id="pie-custom-dates" style="display: flex; flex-direction: column; align-items: center; gap: var(--spacing-sm);">
+                        <div style="display: flex; align-items: center; gap: var(--spacing-sm); background: var(--color-bg-secondary); padding: 4px 8px; border-radius: var(--radius-sm); border: 1px solid var(--color-border);">
+                            <input type="date" id="report-pie-date-start" style="padding: 6px 10px; border: none; background: transparent; color: var(--color-text); font-family: var(--font-family); font-size: var(--font-size-xs); min-width: 130px; outline: none;">
+                            <span style="color: var(--color-text-secondary); font-size: var(--font-size-sm); font-weight: 500; padding: 0 4px;">—</span>
+                            <input type="date" id="report-pie-date-end" style="padding: 6px 10px; border: none; background: transparent; color: var(--color-text); font-family: var(--font-family); font-size: var(--font-size-xs); min-width: 130px; outline: none;">
                         </div>
-                        <button class="btn btn-primary" id="apply-pie-dates" style="width: 100%; padding: 6px 16px; background: var(--color-text); color: var(--color-bg); border: 1px solid var(--color-text); border-radius: var(--radius-sm); font-family: var(--font-family); font-size: var(--font-size-xs); font-weight: 500; cursor: pointer; transition: var(--transition); white-space: nowrap; text-align: center;">Применить даты</button>
+                        <button id="apply-pie-dates" style="padding: 6px 16px; background: var(--color-text); color: var(--color-bg); border: 1px solid var(--color-text); border-radius: var(--radius-sm); font-family: var(--font-family); font-size: var(--font-size-xs); font-weight: 500; cursor: pointer; transition: var(--transition); white-space: nowrap;">Применить</button>
                     </div>
                     
-                    <!-- Категории -->
-                    <div style="display: flex; flex-direction: column; gap: var(--spacing-sm); width: 100%; box-sizing: border-box;">
-                        <!-- Основные категории -->
-                        <div style="display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; padding: 8px 10px; background: var(--color-bg-secondary); border-radius: var(--radius-sm); border: 1px solid var(--color-border); width: 100%; box-sizing: border-box;">
-                            <button class="category-filter-btn active" data-category="all" style="padding: 4px 10px; border: 1px solid var(--color-text); background: var(--color-text); color: var(--color-bg); border-radius: var(--radius-sm); font-family: var(--font-family); font-size: var(--font-size-xs); font-weight: 500; cursor: pointer; transition: var(--transition); white-space: nowrap;">Все</button>
-                            <button class="category-filter-btn main-cat" data-category="food" data-color="#F59E0B" style="padding: 4px 10px; border: 1px solid var(--color-border); background: transparent; color: #F59E0B; border-radius: var(--radius-sm); font-family: var(--font-family); font-size: var(--font-size-xs); font-weight: 500; cursor: pointer; transition: var(--transition); white-space: nowrap;">◻ Еда</button>
-                            <button class="category-filter-btn main-cat" data-category="transport" data-color="#666666" style="padding: 4px 10px; border: 1px solid var(--color-border); background: transparent; color: #666666; border-radius: var(--radius-sm); font-family: var(--font-family); font-size: var(--font-size-xs); font-weight: 500; cursor: pointer; transition: var(--transition); white-space: nowrap;">◆ Транспорт</button>
-                            <button class="category-filter-btn main-cat" data-category="entertainment" data-color="#666666" style="padding: 4px 10px; border: 1px solid var(--color-border); background: transparent; color: #666666; border-radius: var(--radius-sm); font-family: var(--font-family); font-size: var(--font-size-xs); font-weight: 500; cursor: pointer; transition: var(--transition); white-space: nowrap;">★ Развлечения</button>
-                            <button class="category-filter-btn main-cat" data-category="shopping" data-color="#666666" style="padding: 4px 10px; border: 1px solid var(--color-border); background: transparent; color: #666666; border-radius: var(--radius-sm); font-family: var(--font-family); font-size: var(--font-size-xs); font-weight: 500; cursor: pointer; transition: var(--transition); white-space: nowrap;">● Покупки</button>
-                            <button class="category-filter-btn main-cat" data-category="bills" data-color="#666666" style="padding: 4px 10px; border: 1px solid var(--color-border); background: transparent; color: #666666; border-radius: var(--radius-sm); font-family: var(--font-family); font-size: var(--font-size-xs); font-weight: 500; cursor: pointer; transition: var(--transition); white-space: nowrap;">▦ Счета</button>
-                            <button class="category-filter-btn main-cat" data-category="health" data-color="#666666" style="padding: 4px 10px; border: 1px solid var(--color-border); background: transparent; color: #666666; border-radius: var(--radius-sm); font-family: var(--font-family); font-size: var(--font-size-xs); font-weight: 500; cursor: pointer; transition: var(--transition); white-space: nowrap;">▲ Здоровье</button>
-                            <button class="category-filter-btn main-cat" data-category="other_expense" data-color="#666666" style="padding: 4px 10px; border: 1px solid var(--color-border); background: transparent; color: #666666; border-radius: var(--radius-sm); font-family: var(--font-family); font-size: var(--font-size-xs); font-weight: 500; cursor: pointer; transition: var(--transition); white-space: nowrap;">◼ Прочее</button>
-                        </div>
-                        
-                        <!-- Блоки подкатегорий для каждой выбранной категории -->
-                        <div id="subcategories-container" style="display: flex; flex-direction: column; gap: var(--spacing-sm); width: 100%; box-sizing: border-box;">
-                            <!-- Подкатегории загружаются через JS -->
-                        </div>
+                    <!-- Категории в виде кнопок -->
+                    <div style="display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; padding: 8px 10px; background: var(--color-bg-secondary); border-radius: var(--radius-sm); border: 1px solid var(--color-border); width: 100%; box-sizing: border-box;" id="category-filter-buttons">
+                        <!-- Заполняется через JS -->
                     </div>
                     
-                    <!-- Кнопка очистки фильтров -->
-                    <div style="display: flex; justify-content: center; margin-top: var(--spacing-sm);">
-                        <button class="btn" id="clear-filters-btn" style="padding: 6px 20px; background: transparent; color: var(--color-text); border: 1px solid var(--color-border); border-radius: var(--radius-sm); font-family: var(--font-family); font-size: var(--font-size-xs); font-weight: 500; cursor: pointer; transition: var(--transition);">
-                            ✕ Очистить фильтры
-                        </button>
-                    </div>
+                    <button id="apply-pie-filters" style="padding: 6px 16px; background: var(--color-text); color: var(--color-bg); border: 1px solid var(--color-text); border-radius: var(--radius-sm); font-family: var(--font-family); font-size: var(--font-size-xs); font-weight: 500; cursor: pointer; transition: var(--transition); white-space: nowrap;">Применить</button>
                 </div>
             </div>
         </div>

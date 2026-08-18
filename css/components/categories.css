@@ -52,6 +52,7 @@
     transform: translateY(-1px);
 }
 
+/* ===== ВКЛАДКИ ТИПОВ КАТЕГОРИЙ ===== */
 .categories-tabs {
     display: flex;
     gap: 4px;
@@ -91,6 +92,7 @@
     background: var(--color-text-secondary);
 }
 
+/* ===== СЕТКА КАТЕГОРИЙ ===== */
 .categories-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -100,6 +102,7 @@
     padding: 0 calc(var(--spacing-md) * 3);
 }
 
+/* ===== КАРТОЧКА КАТЕГОРИИ ===== */
 .category-card {
     background: var(--color-bg-card);
     padding: var(--spacing-md) var(--spacing-md);
@@ -117,6 +120,7 @@
     border-color: var(--color-border-light);
 }
 
+/* ===== ВЕРХНЯЯ ЧАСТЬ КАРТОЧКИ - ВСЕ ЭЛЕМЕНТЫ В ОДНУ СТРОКУ ===== */
 .category-card .category-header {
     display: flex;
     align-items: center;
@@ -200,6 +204,7 @@
     border-color: var(--color-text);
 }
 
+/* ===== ПОДКАТЕГОРИИ ===== */
 .subcategories {
     margin-top: var(--spacing-xs);
     padding-top: var(--spacing-xs);
@@ -220,12 +225,6 @@
 
 .subcategory-item:hover {
     background: var(--color-bg-hover);
-}
-
-.subcategory-item .sub-icon {
-    margin-right: var(--spacing-xs);
-    font-size: var(--font-size-sm);
-    flex-shrink: 0;
 }
 
 .subcategory-item .sub-name {
@@ -263,6 +262,7 @@
     border-color: var(--color-border);
 }
 
+/* ===== ДОБАВЛЕНИЕ КАТЕГОРИИ ===== */
 .add-category-card {
     border: 2px dashed var(--color-border);
     background: transparent;
@@ -293,6 +293,7 @@
     color: var(--color-text-secondary);
 }
 
+/* ===== АДАПТИВНОСТЬ ===== */
 @media (max-width: 1024px) {
     .categories {
         padding: var(--spacing-md) calc(var(--spacing-xl) * 2) var(--spacing-xl) calc(var(--spacing-xl) * 2);
@@ -360,6 +361,7 @@
     }
 }
 
+/* ===== ИЗМЕНЕНИЕ №6: УЛУЧШЕННЫЙ АДАПТИВ ДЛЯ 480px И МЕНЕЕ ===== */
 @media (max-width: 480px) {
     .categories {
         padding: var(--spacing-xs) var(--spacing-sm) var(--spacing-sm) var(--spacing-sm);
@@ -368,13 +370,24 @@
     }
     .categories-header {
         padding: 0 var(--spacing-xs);
+        gap: var(--spacing-xs);
+    }
+    .categories-header h2 {
+        font-size: var(--font-size-lg);
+    }
+    .categories-header .btn,
+    #add-category-btn {
+        font-size: 10px;
+        padding: 4px 12px;
     }
     .categories-tabs {
         padding: 0 var(--spacing-xs);
+        gap: 2px;
     }
     .category-tab {
         font-size: 9px;
         padding: 4px 6px;
+        border-radius: var(--radius-sm);
     }
     .categories-grid {
         grid-template-columns: 1fr 1fr;
@@ -383,6 +396,7 @@
     }
     .category-card {
         padding: var(--spacing-xs) var(--spacing-xs);
+        border-radius: var(--radius-sm);
     }
     .category-card .category-icon {
         font-size: 13px;
@@ -392,12 +406,17 @@
     }
     .category-card .category-count {
         font-size: 7px;
+        margin: 2px 0 1px 0;
     }
     .category-card .btn-add-sub,
     .category-card .btn-edit-cat,
     .category-card .btn-delete-cat {
         font-size: 9px;
         padding: 0px 3px;
+    }
+    .category-card .category-header {
+        min-height: 24px;
+        gap: 2px;
     }
     .subcategory-item {
         font-size: 9px;
@@ -415,11 +434,54 @@
     }
     .add-category-card {
         min-height: 55px;
+        padding: var(--spacing-xs);
     }
     .add-category-card .plus {
         font-size: 14px;
     }
     .add-category-card .text {
         font-size: 7px;
+    }
+}
+
+/* ===== ДОПОЛНИТЕЛЬНЫЙ АДАПТИВ ДЛЯ 380px ===== */
+@media (max-width: 380px) {
+    .categories {
+        padding: var(--spacing-xs) var(--spacing-xs) var(--spacing-sm) var(--spacing-xs);
+        gap: var(--spacing-xs);
+    }
+    .categories-grid {
+        grid-template-columns: 1fr;
+        gap: var(--spacing-xs);
+    }
+    .category-tab {
+        font-size: 8px;
+        padding: 3px 4px;
+    }
+    .category-card .category-name {
+        font-size: 8px;
+    }
+    .category-card .category-icon {
+        font-size: 11px;
+    }
+    .category-card .btn-add-sub,
+    .category-card .btn-edit-cat,
+    .category-card .btn-delete-cat {
+        font-size: 8px;
+        padding: 0px 2px;
+    }
+    .subcategory-item {
+        font-size: 8px;
+        padding: 2px 2px;
+    }
+    .subcategory-item .sub-name {
+        font-size: 8px;
+    }
+    .subcategory-item .sub-count {
+        font-size: 7px;
+    }
+    .subcategory-item .sub-actions button {
+        font-size: 7px;
+        padding: 0px 2px;
     }
 }
