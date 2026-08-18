@@ -1,4 +1,4 @@
-// ===== МОДУЛЬ: ДОЛГИ =====
+// ===== modules/debts.js =====
 import { openModal } from '../components/modal.js';
 import { showToast } from '../components/toast.js';
 
@@ -86,7 +86,8 @@ function checkRepeatingDebts() {
                 lastRepeatDate: nextDate.toISOString().split('T')[0],
                 lastRepeatDateEnd: debt.lastRepeatDateEnd,
                 parentDebtId: debt.id,
-                transactionIds: []
+                transactionIds: [],
+                showOnDashboard: true
             };
             
             const allDebts = getDebts();
@@ -148,21 +149,26 @@ function renderDebts() {
     document.getElementById('remaining-debts').textContent = remaining.toFixed(2) + ' ₽';
     document.getElementById('paid-debts').textContent = totalPaid.toFixed(2) + ' ₽';
 
+    // Строим HTML для сетки
+    let html = '';
+
+    // Первая карточка - "Добавить долг"
+    html += `
+        <div class="debt-card add-debt-card" id="add-debt-card">
+            <span class="plus">+</span>
+            <span class="text">Добавить долг</span>
+        </div>
+    `;
+
     if (!filtered.length) {
-        container.innerHTML = `
-            <div class="debt-card" style="grid-column: 1 / -1; min-height: 200px; display: flex; align-items: center; justify-content: center;">
-                <div class="empty-state">
-                    <span class="icon">◆</span>
-                    <p>Нет долгов</p>
-                    <button class="btn btn-primary" id="add-first-debt" style="margin-top:12px;">+ Добавить долг</button>
-                </div>
-            </div>
-        `;
-        document.getElementById('add-first-debt')?.addEventListener('click', openAddDebtModal);
+        // Если нет долгов, показываем только карточку добавления
+        container.innerHTML = html;
+        document.getElementById('add-debt-card')?.addEventListener('click', openAddDebtModal);
         return;
     }
 
-    container.innerHTML = filtered.map(debt => {
+    // Добавляем карточки долгов
+    filtered.forEach(debt => {
         const category = expenseCategories.find(c => c.id === debt.categoryId);
         const subcategory = debt.subcategoryId ? expenseCategories.find(c => c.id === debt.subcategoryId) : null;
         const color = subcategory?.color || category?.color || '#666666';
@@ -179,8 +185,9 @@ function renderDebts() {
         const categoryName = subcategory?.name || category?.name || 'Без категории';
         const repeatLabel = getRepeatLabel(debt.repeatType, debt.repeatInterval);
         const hasTransactions = debt.transactionIds && debt.transactionIds.length > 0;
+        const showOnDashboard = debt.showOnDashboard !== false;
 
-        return `
+        html += `
             <div class="debt-card" data-debt-id="${debt.id}">
                 <div class="debt-header">
                     <span class="debt-title" style="color: ${color};">${icon} ${debt.title}</span>
@@ -208,15 +215,18 @@ function renderDebts() {
                     </div>
                 ` : ''}
                 <div class="debt-actions">
+                    <button class="btn-debt-toggle" data-id="${debt.id}">
+                        ${showOnDashboard ? 'Скрыть' : 'Показать'}
+                    </button>
                     ${!isPaid ? `
-                        <button class="btn-pay-full" data-id="${debt.id}">💰 Погасить полностью</button>
-                        <button class="btn-pay-partial" data-id="${debt.id}">📊 Пополнить частично</button>
+                        <button class="btn-debt-pay-full" data-id="${debt.id}">Погасить полностью</button>
+                        <button class="btn-debt-pay-partial" data-id="${debt.id}">Частично</button>
                     ` : `
-                        <button class="btn-restore-debt" data-id="${debt.id}">↩ Вернуть</button>
+                        <button class="btn-debt-restore" data-id="${debt.id}">Вернуть</button>
                     `}
-                    ${debt.paidAmount > 0 ? `<button class="btn-reset-debt" data-id="${debt.id}">⟲ Обнулить</button>` : ''}
-                    <button class="btn-edit-debt" data-id="${debt.id}">✎</button>
-                    <button class="btn-delete-debt" data-id="${debt.id}">✕</button>
+                    ${debt.paidAmount > 0 ? `<button class="btn-debt-reset" data-id="${debt.id}">Обнулить</button>` : ''}
+                    <button class="btn-debt-edit" data-id="${debt.id}">Редактировать</button>
+                    <button class="btn-debt-delete" data-id="${debt.id}">Удалить</button>
                 </div>
                 ${hasTransactions ? `
                     <div style="font-size:10px;color:var(--color-text-muted);margin-top:4px;border-top:1px solid var(--color-border);padding-top:4px;">
@@ -225,49 +235,74 @@ function renderDebts() {
                 ` : ''}
             </div>
         `;
-    }).join('');
+    });
 
-    document.querySelectorAll('.btn-pay-full').forEach(btn => {
+    container.innerHTML = html;
+
+    // Обработчик для карточки добавления
+    document.getElementById('add-debt-card')?.addEventListener('click', openAddDebtModal);
+
+    // Обработчики для кнопок
+    document.querySelectorAll('.btn-debt-toggle').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const id = e.currentTarget.dataset.id;
+            toggleDebtVisibility(id);
+        });
+    });
+
+    document.querySelectorAll('.btn-debt-pay-full').forEach(btn => {
         btn.addEventListener('click', (e) => {
             const id = e.currentTarget.dataset.id;
             openPayDebtModal(id, 'full');
         });
     });
 
-    document.querySelectorAll('.btn-pay-partial').forEach(btn => {
+    document.querySelectorAll('.btn-debt-pay-partial').forEach(btn => {
         btn.addEventListener('click', (e) => {
             const id = e.currentTarget.dataset.id;
             openPayDebtModal(id, 'partial');
         });
     });
 
-    document.querySelectorAll('.btn-restore-debt').forEach(btn => {
+    document.querySelectorAll('.btn-debt-restore').forEach(btn => {
         btn.addEventListener('click', (e) => {
             const id = e.currentTarget.dataset.id;
             restoreDebt(id);
         });
     });
 
-    document.querySelectorAll('.btn-reset-debt').forEach(btn => {
+    document.querySelectorAll('.btn-debt-reset').forEach(btn => {
         btn.addEventListener('click', (e) => {
             const id = e.currentTarget.dataset.id;
             resetDebt(id);
         });
     });
 
-    document.querySelectorAll('.btn-edit-debt').forEach(btn => {
+    document.querySelectorAll('.btn-debt-edit').forEach(btn => {
         btn.addEventListener('click', (e) => {
             const id = e.currentTarget.dataset.id;
             openEditDebtModal(id);
         });
     });
 
-    document.querySelectorAll('.btn-delete-debt').forEach(btn => {
+    document.querySelectorAll('.btn-debt-delete').forEach(btn => {
         btn.addEventListener('click', (e) => {
             const id = e.currentTarget.dataset.id;
             deleteDebt(id);
         });
     });
+}
+
+function toggleDebtVisibility(id) {
+    const debts = getDebts();
+    const debt = debts.find(d => d.id === id);
+    if (!debt) return;
+
+    debt.showOnDashboard = debt.showOnDashboard === false ? true : false;
+    saveDebts(debts);
+    renderDebts();
+    document.dispatchEvent(new Event('debt-updated'));
+    showToast(`Долг "${debt.title}" ${debt.showOnDashboard ? 'показан' : 'скрыт'} на главной`, 'success');
 }
 
 function getRepeatLabel(repeatType, interval) {
@@ -301,7 +336,8 @@ function setupEventListeners() {
         });
     });
 
-    document.getElementById('add-debt-btn')?.addEventListener('click', openAddDebtModal);
+    // Кнопка в хедере теперь не нужна, удаляем обработчик
+    // document.getElementById('add-debt-btn')?.addEventListener('click', openAddDebtModal);
 
     document.addEventListener('transaction-added', renderDebts);
     document.addEventListener('transaction-deleted', renderDebts);
@@ -399,7 +435,8 @@ function openAddDebtModal() {
             lastRepeatDate: repeatType !== 'none' ? todayStr : '',
             lastRepeatDateEnd: repeatEndDate || '',
             parentDebtId: null,
-            transactionIds: []
+            transactionIds: [],
+            showOnDashboard: true
         };
 
         const debts = getDebts();
@@ -534,12 +571,24 @@ function openEditDebtModal(id) {
                 <textarea name="comment" placeholder="Комментарий" 
                           style="width:100%;padding:8px 12px;border-radius:6px;border:1px solid var(--color-border);background:var(--color-bg-input);color:var(--color-text);resize:vertical;min-height:60px;font-size:var(--font-size-sm);box-sizing:border-box;font-family:var(--font-family);">${debt.comment || ''}</textarea>
             </div>
+            <div style="margin-bottom:12px;">
+                <label style="display:block;font-size:var(--font-size-xs);color:var(--color-text-secondary);margin-bottom:4px;">Показывать на главной</label>
+                <div style="display:flex;align-items:center;gap:8px;margin-top:4px;">
+                    <label style="display:flex;align-items:center;gap:6px;font-size:var(--font-size-sm);cursor:pointer;">
+                        <input type="radio" name="showOnDashboard" value="true" ${debt.showOnDashboard !== false ? 'checked' : ''}> Да
+                    </label>
+                    <label style="display:flex;align-items:center;gap:6px;font-size:var(--font-size-sm);cursor:pointer;">
+                        <input type="radio" name="showOnDashboard" value="false" ${debt.showOnDashboard === false ? 'checked' : ''}> Нет
+                    </label>
+                </div>
+            </div>
             <button type="submit" class="btn btn-primary" style="width:100%;padding:10px;">Обновить</button>
         </form>
     `, (formData) => {
         const repeatType = formData.repeatType || 'none';
         const repeatInterval = parseInt(formData.repeatInterval) || 1;
         const todayStr = new Date().toISOString().split('T')[0];
+        const showOnDashboard = formData.showOnDashboard === 'true';
         
         const updated = {
             title: formData.title,
@@ -553,7 +602,8 @@ function openEditDebtModal(id) {
             repeatType: repeatType,
             repeatInterval: repeatInterval,
             lastRepeatDate: repeatType !== 'none' ? (debt.lastRepeatDate || todayStr) : '',
-            lastRepeatDateEnd: formData.repeatEndDate || ''
+            lastRepeatDateEnd: formData.repeatEndDate || '',
+            showOnDashboard: showOnDashboard
         };
 
         const debts = getDebts();
@@ -562,6 +612,7 @@ function openEditDebtModal(id) {
             debts[index] = { ...debts[index], ...updated };
             saveDebts(debts);
             renderDebts();
+            document.dispatchEvent(new Event('debt-updated'));
             showToast('Долг обновлен', 'success');
         }
     });
@@ -612,7 +663,7 @@ function openPayDebtModal(id, mode = 'full') {
     const isFull = mode === 'full';
 
     const title = isFull ? 'Погасить долг полностью' : 'Частичное погашение долга';
-    const buttonText = isFull ? '💰 Погасить полностью' : '📊 Пополнить частично';
+    const buttonText = isFull ? 'Погасить полностью' : 'Погасить частично';
     const defaultAmount = isFull ? remaining : 0;
 
     openModal(title, `
@@ -661,45 +712,47 @@ function openPayDebtModal(id, mode = 'full') {
             return;
         }
 
-        const category = storageInstance.getCategory(debt.categoryId);
-        const subcategory = debt.subcategoryId ? storageInstance.getCategory(debt.subcategoryId) : null;
-
-        // Погашение долга всегда создаёт обычную расходную транзакцию.
-        // Полное погашение списывает весь остаток, частичное — только введённую сумму.
-        const transactionData = {
-            type: 'expense',
-            amount: payAmount,
-            categoryId: debt.categoryId,
-            categoryName: category?.name || '',
-            subcategoryId: debt.subcategoryId || '',
-            subcategoryName: subcategory?.name || '',
-            category: debt.subcategoryId || debt.categoryId,
-            date: formData.payDate || new Date().toISOString().split('T')[0],
-            description: debt.title,
-            comment: formData.payComment || debt.comment || '',
-            photo: '',
-            isDebtPayment: true,
-            debtId: debt.id,
-            debtTitle: debt.title,
-            debtDueDate: debt.dueDate || '',
-            debtPaymentType: isFull ? 'full' : 'partial'
-        };
-
-        let result;
-        try {
-            result = storageInstance.recordDebtPayment(debt.id, transactionData);
-        } catch (error) {
-            showToast(error.message || 'Не удалось сохранить погашение', 'error');
+        const debts = getDebts();
+        const index = debts.findIndex(d => d.id === id);
+        if (index === -1) {
+            showToast('Долг не найден', 'error');
             return;
         }
 
+        debts[index].paidAmount = (debts[index].paidAmount || 0) + payAmount;
+        saveDebts(debts);
         renderDebts();
+
+        const category = storageInstance.getCategory(debt.categoryId);
+        const subcategory = debt.subcategoryId ? storageInstance.getCategory(debt.subcategoryId) : null;
+        
+        const transaction = {
+            type: 'expense',
+            amount: payAmount,
+            category: debt.subcategoryId || debt.categoryId,
+            categoryName: subcategory?.name || category?.name || 'Погашение долга',
+            date: formData.payDate || new Date().toISOString().split('T')[0],
+            description: `Погашение долга: ${debt.title}`,
+            comment: formData.payComment || `Погашено ${payAmount.toFixed(2)} ₽ из ${debt.amount.toFixed(2)} ₽`,
+            photo: '',
+            isDebtPayment: true
+        };
+        
+        const savedTransaction = storageInstance.addTransaction(transaction);
+        
+        if (savedTransaction && savedTransaction.id) {
+            if (!debts[index].transactionIds) {
+                debts[index].transactionIds = [];
+            }
+            debts[index].transactionIds.push(savedTransaction.id);
+            saveDebts(debts);
+        }
+        
         showToast(`Погашено ${payAmount.toFixed(2)} ₽`, 'success');
-        window.app?.refreshHeader?.();
         document.dispatchEvent(new Event('transaction-added'));
         document.dispatchEvent(new Event('debt-updated'));
-
-        if (result.debt.paidAmount >= result.debt.amount) {
+        
+        if (debts[index].paidAmount >= debts[index].amount) {
             showToast(`Долг "${debt.title}" полностью погашен! 🎉`, 'success');
         }
     });
@@ -718,7 +771,6 @@ function restoreDebt(id) {
         return;
     }
 
-    // Удаляем все связанные транзакции при возврате
     if (debt.transactionIds && debt.transactionIds.length > 0) {
         let deletedCount = 0;
         debt.transactionIds.forEach(transactionId => {
@@ -737,6 +789,7 @@ function restoreDebt(id) {
     debts[index].transactionIds = [];
     saveDebts(debts);
     renderDebts();
+    document.dispatchEvent(new Event('debt-updated'));
     showToast(`Долг "${debt.title}" возвращен в активные`, 'success');
     document.dispatchEvent(new Event('transaction-deleted'));
 }
@@ -770,7 +823,7 @@ function resetDebt(id) {
     debts[index].transactionIds = [];
     saveDebts(debts);
     renderDebts();
-    
+    document.dispatchEvent(new Event('debt-updated'));
     showToast(`Долг "${debt.title}" обнулен`, 'success');
     document.dispatchEvent(new Event('transaction-deleted'));
 }
@@ -798,6 +851,7 @@ function deleteDebt(id) {
         const newDebts = debts.filter(d => d.id !== id);
         saveDebts(newDebts);
         renderDebts();
+        document.dispatchEvent(new Event('debt-updated'));
         showToast('Долг удален', 'success');
         document.dispatchEvent(new Event('transaction-deleted'));
     }

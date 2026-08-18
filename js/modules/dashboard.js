@@ -1,4 +1,4 @@
-// ===== МОДУЛЬ: ДАШБОРД =====
+// ===== modules/dashboard.js =====
 import { DEFAULT_CATEGORIES } from '../config/constants.js';
 import { formatDateToRussian } from '../utils/dateHelpers.js';
 
@@ -84,9 +84,14 @@ function getFilteredDebts() {
     const data = storageInstance.getData();
     const debts = data.debts || [];
     const range = getCurrentPeriodRange();
-    if (!range) return debts;
+    let filtered = debts;
+    
+    // Фильтруем по showOnDashboard (по умолчанию true, если поле отсутствует)
+    filtered = filtered.filter(debt => debt.showOnDashboard !== false);
+    
+    if (!range) return filtered;
 
-    return debts.filter(debt => {
+    return filtered.filter(debt => {
         const sourceDate = debt.dueDate || (debt.createdAt ? debt.createdAt.slice(0, 10) : '');
         if (!sourceDate) return false;
         const date = new Date(`${sourceDate}T12:00:00`);
@@ -118,7 +123,7 @@ function getUpcomingDebtReminders() {
     today.setHours(0, 0, 0, 0);
 
     return debts
-        .filter(debt => (debt.paidAmount || 0) < debt.amount && debt.dueDate)
+        .filter(debt => (debt.paidAmount || 0) < debt.amount && debt.dueDate && debt.showOnDashboard !== false)
         .map(debt => {
             const due = new Date(`${debt.dueDate}T00:00:00`);
             const daysLeft = Math.ceil((due - today) / (1000 * 60 * 60 * 24));
