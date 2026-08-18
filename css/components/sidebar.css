@@ -11,8 +11,9 @@
     justify-content: center;
     z-index: 50;
     flex-shrink: 0;
-    position: sticky;
+    position: relative;
     bottom: 0;
+    min-height: 64px;
 }
 
 .sidebar-nav {
@@ -85,9 +86,10 @@
 @media (max-width: 768px) {
     #sidebar {
         height: 100%;
+        min-height: 56px;
         padding: 2px var(--spacing-sm);
         flex-shrink: 0;
-        position: sticky;
+        position: relative;
         bottom: 0;
     }
 
@@ -114,9 +116,12 @@
 
 @media (max-width: 480px) {
     #sidebar {
+        min-height: 52px;
         padding: 2px var(--spacing-xs);
-        position: sticky;
+        position: relative;
         bottom: 0;
+        height: 100%;
+        flex-shrink: 0;
     }
 
     .nav-item {
