@@ -72,7 +72,6 @@ self.addEventListener('fetch', (event) => {
       }
 
       return fetch(event.request).then((response) => {
-        // Не кэшируем API запросы и запросы к localStorage
         if (
           !response ||
           response.status !== 200 ||
