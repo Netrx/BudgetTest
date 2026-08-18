@@ -97,6 +97,8 @@ body {
     justify-content: center;
     z-index: 50;
     flex-shrink: 0;
+    position: sticky;
+    bottom: 0;
 }
 
 /* ===== ГЛОБАЛЬНЫЙ СТИЛЬ ДЛЯ ВСЕХ КНОПОК ===== */
@@ -246,5 +248,10 @@ input::placeholder, textarea::placeholder {
         width: 100%;
         text-align: center;
         padding: 8px 16px;
+    }
+
+    #sidebar {
+        position: sticky;
+        bottom: 0;
     }
 }

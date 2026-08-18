@@ -15,7 +15,6 @@ class App {
         this.setupNavigation();
         this.loadSidebar();
         this.loadHeader();
-        this.setupMobileMenu();
         this.applyTheme();
     }
 
@@ -95,7 +94,6 @@ class App {
         header.innerHTML = `
             <div class="header-content">
                 <div class="header-left">
-                    <button class="menu-toggle" id="menuToggle">≡</button>
                     <span class="logo">Бюджет</span>
                 </div>
                 <div class="header-right">
@@ -106,14 +104,6 @@ class App {
                 </div>
             </div>
         `;
-    }
-
-    setupMobileMenu() {
-        document.addEventListener('click', (e) => {
-            if (e.target.id === 'menuToggle') {
-                showToast('Навигация внизу экрана', 'info');
-            }
-        });
     }
 
     toggleTheme() {

@@ -26,22 +26,6 @@
     gap: var(--spacing-md);
 }
 
-.menu-toggle {
-    display: none;
-    background: none;
-    border: none;
-    color: var(--color-text);
-    font-size: var(--font-size-lg);
-    cursor: pointer;
-    padding: var(--spacing-sm);
-    border-radius: var(--radius-sm);
-    transition: var(--transition);
-}
-
-.menu-toggle:hover {
-    background: var(--color-bg-hover);
-}
-
 .logo {
     font-size: var(--font-size-md);
     font-weight: 700;
@@ -78,10 +62,6 @@
     #header {
         padding: 0 var(--spacing-md);
         height: 48px;
-    }
-
-    .menu-toggle {
-        display: block;
     }
 
     .logo {
