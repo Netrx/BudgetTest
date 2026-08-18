@@ -5,31 +5,28 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>💰 Бюджет</title>
 
-    <!-- ВАЖНО: Базовый путь для GitHub Pages -->
-    <base href="/BudgetTest/">
-
     <!-- PWA Манифест -->
-    <link rel="manifest" href="manifest.json" />
+    <link rel="manifest" href="/BudgetTest/manifest.json" />
 
     <!-- Иконки для iOS / Android -->
-    <link rel="apple-touch-icon" href="icons/icon-192.png" />
+    <link rel="apple-touch-icon" href="/BudgetTest/icons/icon-192.png" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Бюджет" />
     <meta name="theme-color" content="#000000" />
 
-    <!-- CSS (Папка css/ убрана, путь берется из base) -->
-    <link rel="stylesheet" href="variables.css" />
-    <link rel="stylesheet" href="styles.css" />
-    <link rel="stylesheet" href="header.css" />
-    <link rel="stylesheet" href="sidebar.css" />
-    <link rel="stylesheet" href="dashboard.css" />
-    <link rel="stylesheet" href="transactions.css" />
-    <link rel="stylesheet" href="categories.css" />
-    <link rel="stylesheet" href="reports.css" />
-    <link rel="stylesheet" href="settings.css" />
-    <link rel="stylesheet" href="colorPicker.css" />
-    <link rel="stylesheet" href="debts.css" />
+    <!-- CSS -->
+    <link rel="stylesheet" href="/BudgetTest/css/variables.css" />
+    <link rel="stylesheet" href="/BudgetTest/css/styles.css" />
+    <link rel="stylesheet" href="/BudgetTest/css/header.css" />
+    <link rel="stylesheet" href="/BudgetTest/css/sidebar.css" />
+    <link rel="stylesheet" href="/BudgetTest/css/dashboard.css" />
+    <link rel="stylesheet" href="/BudgetTest/css/transactions.css" />
+    <link rel="stylesheet" href="/BudgetTest/css/categories.css" />
+    <link rel="stylesheet" href="/BudgetTest/css/reports.css" />
+    <link rel="stylesheet" href="/BudgetTest/css/settings.css" />
+    <link rel="stylesheet" href="/BudgetTest/css/colorPicker.css" />
+    <link rel="stylesheet" href="/BudgetTest/css/debts.css" />
 
     <!-- Шрифты -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -38,7 +35,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
     <!-- Основной скрипт -->
-    <script type="module" src="app.js"></script>
+    <script type="module" src="/BudgetTest/js/app.js"></script>
 </head>
 <body>
     <div id="app">
@@ -47,11 +44,11 @@
         <aside id="sidebar"></aside>
     </div>
 
-    <!-- Регистрация Service Worker -->
+    <!-- Регистрация Service Worker (переименован в sw-v2.js, чтобы сбросить старый кэш) -->
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js')
+                navigator.serviceWorker.register('/BudgetTest/sw-v2.js')
                     .then(reg => console.log('SW зарегистрирован:', reg))
                     .catch(err => console.error('Ошибка регистрации SW:', err));
             });
