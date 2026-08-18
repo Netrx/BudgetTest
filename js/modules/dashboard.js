@@ -20,11 +20,8 @@ function getFilteredTransactions() {
     let startDate = null;
     let endDate = null;
 
-    console.log('getFilteredTransactions - currentPeriod:', currentPeriod);
-
     switch (currentPeriod) {
         case 'all':
-            console.log('Возвращаем все транзакции:', allTransactions.length);
             return allTransactions;
         case 'year':
             startDate = new Date(now.getFullYear(), 0, 1);
@@ -39,7 +36,6 @@ function getFilteredTransactions() {
                 startDate = new Date(customStartDate);
                 endDate = new Date(customEndDate);
             } else {
-                console.log('Кастомные даты не установлены');
                 return allTransactions;
             }
             break;
@@ -50,10 +46,7 @@ function getFilteredTransactions() {
     if (startDate && endDate) {
         const startStr = startDate.toISOString().split('T')[0];
         const endStr = endDate.toISOString().split('T')[0];
-        console.log(`Фильтр по датам: ${startStr} — ${endStr}`);
-        const filtered = allTransactions.filter(t => t.date >= startStr && t.date <= endStr);
-        console.log('Отфильтровано:', filtered.length, 'транзакций');
-        return filtered;
+        return allTransactions.filter(t => t.date >= startStr && t.date <= endStr);
     }
 
     return allTransactions;
@@ -105,13 +98,8 @@ function getDaysInPeriod() {
 }
 
 function renderDashboard() {
-    console.log('renderDashboard вызван, период:', currentPeriod);
-    
     const transactions = getFilteredTransactions();
     const daysInPeriod = getDaysInPeriod();
-    
-    console.log('Транзакций для отображения:', transactions.length);
-    console.log('Дней в периоде:', daysInPeriod);
     
     const totalIncome = transactions
         .filter(t => t.type === 'income')
@@ -128,10 +116,22 @@ function renderDashboard() {
     const avgIncomeEl = document.getElementById('stat-avg-income');
     const avgExpenseEl = document.getElementById('stat-avg-expense');
 
-    if (incomeEl) incomeEl.textContent = totalIncome.toFixed(2) + ' ₽';
-    if (expenseEl) expenseEl.textContent = totalExpense.toFixed(2) + ' ₽';
-    if (avgIncomeEl) avgIncomeEl.textContent = avgIncome.toFixed(2) + ' ₽';
-    if (avgExpenseEl) avgExpenseEl.textContent = avgExpense.toFixed(2) + ' ₽';
+    if (incomeEl) {
+        incomeEl.textContent = totalIncome.toFixed(2) + ' ₽';
+        incomeEl.style.color = '#22C55E';
+    }
+    if (expenseEl) {
+        expenseEl.textContent = totalExpense.toFixed(2) + ' ₽';
+        expenseEl.style.color = '#EF4444';
+    }
+    if (avgIncomeEl) {
+        avgIncomeEl.textContent = avgIncome.toFixed(2) + ' ₽';
+        avgIncomeEl.style.color = '#22C55E';
+    }
+    if (avgExpenseEl) {
+        avgExpenseEl.textContent = avgExpense.toFixed(2) + ' ₽';
+        avgExpenseEl.style.color = '#EF4444';
+    }
 
     renderRecentTransactions(transactions.slice(-5).reverse());
     renderChart(transactions);
@@ -151,6 +151,8 @@ function renderRecentTransactions(transactions) {
         const color = getCategoryColor(t);
         const formattedDate = formatDateToRussian(t.date);
         const displayName = getCategoryDisplayName(t);
+        const amountColor = t.type === 'income' ? '#22C55E' : '#EF4444';
+        const sign = t.type === 'income' ? '+' : '-';
         
         return `
             <div class="transaction-item">
@@ -161,7 +163,7 @@ function renderRecentTransactions(transactions) {
                         <div class="meta">${formattedDate} • ${t.description || 'Без описания'}</div>
                     </div>
                 </div>
-                <div class="amount">${t.type === 'income' ? '+' : '-'} ${t.amount.toFixed(2)} ₽</div>
+                <div class="amount" style="color: ${amountColor};">${sign} ${t.amount.toFixed(2)} ₽</div>
             </div>
         `;
     }).join('');
@@ -201,7 +203,7 @@ function getCategoryColor(transaction) {
         return cat.color;
     }
     
-    return transaction.type === 'income' ? '#000000' : '#666666';
+    return transaction.type === 'income' ? '#22C55E' : '#EF4444';
 }
 
 function getCategoryDisplayName(transaction) {
@@ -236,22 +238,6 @@ function renderChart(transactions) {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    console.log('renderChart - транзакций для графика:', transactions.length);
-
-    // Группируем транзакции по датам
-    const grouped = {};
-    transactions.forEach(t => {
-        if (!grouped[t.date]) grouped[t.date] = { income: 0, expense: 0 };
-        if (t.type === 'income') grouped[t.date].income += t.amount;
-        else grouped[t.date].expense += t.amount;
-    });
-
-    const dates = Object.keys(grouped).sort();
-    const incomeData = dates.map(d => grouped[d].income);
-    const expenseData = dates.map(d => grouped[d].expense);
-
-    console.log('Даты для графика:', dates.length);
-
     // Уничтожаем старый график если есть
     if (chartInstance) {
         chartInstance.destroy();
@@ -259,7 +245,7 @@ function renderChart(transactions) {
     }
 
     // Если нет данных, показываем сообщение
-    if (!dates.length) {
+    if (!transactions.length) {
         const parent = canvas.parentElement;
         const oldMsg = parent.querySelector('.chart-empty-state');
         if (oldMsg) oldMsg.remove();
@@ -295,54 +281,145 @@ function renderChart(transactions) {
     const textColor = isDark ? '#FFFFFF' : '#000000';
     const gridColor = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
 
-    // Форматируем даты для отображения
-    const formattedLabels = dates.map(d => {
-        const date = new Date(d);
-        return `${date.getDate()}.${String(date.getMonth() + 1).padStart(2, '0')}`;
-    });
+    let labels = [];
+    let incomeData = [];
+    let expenseData = [];
 
-    // Если дат много, показываем не все подписи
-    let maxLabels = 20;
-    let displayLabels = formattedLabels;
-    let displayIncomeData = incomeData;
-    let displayExpenseData = expenseData;
-    
-    if (dates.length > maxLabels) {
-        const step = Math.ceil(dates.length / maxLabels);
-        displayLabels = [];
-        displayIncomeData = [];
-        displayExpenseData = [];
-        for (let i = 0; i < dates.length; i += step) {
-            displayLabels.push(formattedLabels[i]);
-            displayIncomeData.push(incomeData[i]);
-            displayExpenseData.push(expenseData[i]);
+    // ===== ЛОГИКА ГРУППИРОВКИ В ЗАВИСИМОСТИ ОТ ПЕРИОДА =====
+    switch (currentPeriod) {
+        case 'all': {
+            // Все время: 2 столбца - всего доходов и всего расходов
+            const totalIncome = transactions
+                .filter(t => t.type === 'income')
+                .reduce((sum, t) => sum + t.amount, 0);
+            const totalExpense = transactions
+                .filter(t => t.type === 'expense')
+                .reduce((sum, t) => sum + t.amount, 0);
+            
+            labels = ['Всего'];
+            incomeData = [totalIncome];
+            expenseData = [totalExpense];
+            break;
         }
+        
+        case 'year': {
+            // Год: группировка по месяцам
+            const months = {};
+            const monthNames = ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек'];
+            
+            transactions.forEach(t => {
+                const date = new Date(t.date);
+                const monthKey = date.getMonth();
+                if (!months[monthKey]) {
+                    months[monthKey] = { income: 0, expense: 0, label: monthNames[monthKey] };
+                }
+                if (t.type === 'income') {
+                    months[monthKey].income += t.amount;
+                } else {
+                    months[monthKey].expense += t.amount;
+                }
+            });
+            
+            // Сортируем по месяцам
+            const sortedMonths = Object.keys(months).sort((a, b) => parseInt(a) - parseInt(b));
+            labels = sortedMonths.map(m => months[m].label);
+            incomeData = sortedMonths.map(m => months[m].income);
+            expenseData = sortedMonths.map(m => months[m].expense);
+            break;
+        }
+        
+        case 'month':
+        case 'custom':
+        default: {
+            // Месяц или кастомный период: группировка по дням
+            const days = {};
+            
+            transactions.forEach(t => {
+                if (!days[t.date]) {
+                    days[t.date] = { income: 0, expense: 0 };
+                }
+                if (t.type === 'income') {
+                    days[t.date].income += t.amount;
+                } else {
+                    days[t.date].expense += t.amount;
+                }
+            });
+            
+            const sortedDates = Object.keys(days).sort();
+            
+            // Форматируем даты для отображения
+            labels = sortedDates.map(d => {
+                const date = new Date(d);
+                return `${date.getDate()}.${String(date.getMonth() + 1).padStart(2, '0')}`;
+            });
+            incomeData = sortedDates.map(d => days[d].income);
+            expenseData = sortedDates.map(d => days[d].expense);
+            break;
+        }
+    }
+
+    // Проверяем что данные не пустые
+    if (!labels.length || (incomeData.every(v => v === 0) && expenseData.every(v => v === 0))) {
+        const parent = canvas.parentElement;
+        const oldMsg = parent.querySelector('.chart-empty-state');
+        if (oldMsg) oldMsg.remove();
+        
+        const msg = document.createElement('div');
+        msg.className = 'chart-empty-state';
+        msg.style.cssText = `
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            min-height: 200px;
+            color: var(--color-text-secondary);
+            font-size: var(--font-size-sm);
+        `;
+        msg.innerHTML = `
+            <span style="font-size: 32px; opacity: 0.3; display: block; margin-bottom: 8px;">◻</span>
+            Нет данных за выбранный период
+        `;
+        parent.appendChild(msg);
+        canvas.style.display = 'none';
+        return;
+    }
+
+    // Настройка ширины столбцов в зависимости от количества данных
+    let barPercentage = 0.6;
+    let categoryPercentage = 0.8;
+    if (labels.length === 1) {
+        barPercentage = 0.3;
+        categoryPercentage = 0.4;
+    } else if (labels.length <= 5) {
+        barPercentage = 0.5;
+        categoryPercentage = 0.7;
     }
 
     chartInstance = new Chart(ctx, {
         type: 'bar',
         data: {
-            labels: displayLabels,
+            labels: labels,
             datasets: [
                 {
                     label: 'Доходы',
-                    data: displayIncomeData,
-                    backgroundColor: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)',
-                    borderColor: textColor,
-                    borderWidth: 1,
-                    borderRadius: 2,
-                    barPercentage: 0.4,
-                    categoryPercentage: 0.6
+                    data: incomeData,
+                    backgroundColor: 'rgba(34, 197, 94, 0.7)',
+                    borderColor: '#22C55E',
+                    borderWidth: 2,
+                    borderRadius: 4,
+                    barPercentage: barPercentage,
+                    categoryPercentage: categoryPercentage
                 },
                 {
                     label: 'Расходы',
-                    data: displayExpenseData,
-                    backgroundColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)',
-                    borderColor: textColor,
-                    borderWidth: 1,
-                    borderRadius: 2,
-                    barPercentage: 0.4,
-                    categoryPercentage: 0.6
+                    data: expenseData,
+                    backgroundColor: 'rgba(239, 68, 68, 0.7)',
+                    borderColor: '#EF4444',
+                    borderWidth: 2,
+                    borderRadius: 4,
+                    barPercentage: barPercentage,
+                    categoryPercentage: categoryPercentage
                 }
             ]
         },
@@ -354,9 +431,20 @@ function renderChart(transactions) {
                     position: 'top',
                     labels: {
                         color: textColor,
-                        font: { size: 11 },
-                        boxWidth: 12,
-                        padding: 12
+                        font: { size: 11, weight: '500' },
+                        boxWidth: 14,
+                        padding: 14,
+                        usePointStyle: true,
+                        pointStyle: 'rectRounded'
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.dataset.label || '';
+                            let value = context.parsed.y || 0;
+                            return label + ': ' + value.toFixed(2) + ' ₽';
+                        }
                     }
                 }
             },
@@ -381,9 +469,9 @@ function renderChart(transactions) {
                     ticks: {
                         color: textColor,
                         font: { size: 9 },
-                        maxRotation: 45,
-                        autoSkip: true,
-                        maxTicksLimit: 15
+                        maxRotation: labels.length > 10 ? 45 : 0,
+                        autoSkip: labels.length > 20,
+                        maxTicksLimit: 20
                     },
                     grid: {
                         display: false
@@ -405,14 +493,11 @@ function setupEventListeners() {
         btn.addEventListener('click', function(e) {
             const period = this.dataset.period;
             
-            console.log('Нажата кнопка периода:', period);
-            
             // Обновляем активную кнопку
             periodBtns.forEach(b => b.classList.remove('active'));
             this.classList.add('active');
 
             if (period === 'custom') {
-                // Показываем поля для выбора дат
                 if (customInputs) customInputs.style.display = 'flex';
                 const now = new Date();
                 const monthAgo = new Date(now);
@@ -428,15 +513,12 @@ function setupEventListeners() {
                 return;
             }
             
-            // Скрываем кастомные поля
             if (customInputs) customInputs.style.display = 'none';
             
-            // Устанавливаем период и обновляем данные
             currentPeriod = period;
             customStartDate = null;
             customEndDate = null;
             
-            console.log('Применяем период:', period);
             renderDashboard();
             
             const periodLabels = {
@@ -472,30 +554,16 @@ function setupEventListeners() {
         showToast(`Период: ${formatDateShort(start)} — ${formatDateShort(end)}`, 'success');
     });
 
-    // Слушаем события изменения данных
     document.addEventListener('transaction-added', () => {
-        console.log('Событие transaction-added');
         renderDashboard();
     });
     document.addEventListener('transaction-deleted', () => {
-        console.log('Событие transaction-deleted');
         renderDashboard();
     });
     document.addEventListener('theme-changed', () => {
-        console.log('Событие theme-changed');
         const transactions = getFilteredTransactions();
         renderChart(transactions);
     });
-}
-
-function getPeriodLabel(period) {
-    const labels = {
-        'all': 'Все время',
-        'year': 'Год',
-        'month': 'Месяц',
-        'custom': 'Выбранный'
-    };
-    return labels[period] || period;
 }
 
 function formatDateShort(dateString) {
