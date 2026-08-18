@@ -1,0 +1,87 @@
+<div class="reports">
+    <div class="reports-header">
+        <h2>Отчеты и аналитика</h2>
+        <p>Визуализация ваших доходов и расходов</p>
+    </div>
+    
+    <!-- Фильтры -->
+    <div class="reports-filters" style="
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--spacing-md);
+        padding: 0 calc(var(--spacing-md) * 3);
+        margin-bottom: var(--spacing-md);
+        align-items: flex-end;
+    ">
+        <div class="filter-group" style="flex: 1; min-width: 150px;">
+            <label style="display: block; font-size: var(--font-size-xs); color: var(--color-text-secondary); margin-bottom: 4px;">Период</label>
+            <select id="report-period" style="width: 100%; padding: 8px 12px; border-radius: var(--radius-sm); border: 1px solid var(--color-border); background: var(--color-bg-input); color: var(--color-text); font-family: var(--font-family); font-size: var(--font-size-sm);">
+                <option value="all">Все время</option>
+                <option value="year">Год</option>
+                <option value="month" selected>Месяц</option>
+                <option value="week">Неделя</option>
+                <option value="custom">Свой период</option>
+            </select>
+        </div>
+        
+        <div class="filter-group" id="custom-date-group" style="display: none; flex: 1; min-width: 140px;">
+            <label style="display: block; font-size: var(--font-size-xs); color: var(--color-text-secondary); margin-bottom: 4px;">С</label>
+            <input type="date" id="report-date-start" style="width: 100%; padding: 8px 12px; border-radius: var(--radius-sm); border: 1px solid var(--color-border); background: var(--color-bg-input); color: var(--color-text); font-family: var(--font-family); font-size: var(--font-size-sm);">
+        </div>
+        
+        <div class="filter-group" id="custom-date-group-end" style="display: none; flex: 1; min-width: 140px;">
+            <label style="display: block; font-size: var(--font-size-xs); color: var(--color-text-secondary); margin-bottom: 4px;">По</label>
+            <input type="date" id="report-date-end" style="width: 100%; padding: 8px 12px; border-radius: var(--radius-sm); border: 1px solid var(--color-border); background: var(--color-bg-input); color: var(--color-text); font-family: var(--font-family); font-size: var(--font-size-sm);">
+        </div>
+        
+        <div class="filter-group" style="flex: 1.5; min-width: 180px;">
+            <label style="display: block; font-size: var(--font-size-xs); color: var(--color-text-secondary); margin-bottom: 4px;">Категория</label>
+            <select id="report-category" style="width: 100%; padding: 8px 12px; border-radius: var(--radius-sm); border: 1px solid var(--color-border); background: var(--color-bg-input); color: var(--color-text); font-family: var(--font-family); font-size: var(--font-size-sm);">
+                <option value="all">Все категории</option>
+            </select>
+        </div>
+        
+        <div class="filter-group" style="flex: 0 0 auto;">
+            <button id="apply-report-filters" style="
+                padding: 8px 24px;
+                background: var(--color-text);
+                color: var(--color-bg);
+                border: 1px solid var(--color-text);
+                border-radius: var(--radius-sm);
+                font-family: var(--font-family);
+                font-size: var(--font-size-sm);
+                font-weight: 500;
+                cursor: pointer;
+                transition: var(--transition);
+                white-space: nowrap;
+                height: 40px;
+            ">Применить</button>
+        </div>
+    </div>
+    
+    <div class="reports-grid">
+        <!-- Расходы по категориям -->
+        <div class="report-card">
+            <h3>Расходы по категориям</h3>
+            <div id="category-stats">
+                <div class="loading-state">Загрузка...</div>
+            </div>
+        </div>
+        
+        <!-- Динамика по месяцам -->
+        <div class="report-card">
+            <h3>Динамика по месяцам</h3>
+            <div class="chart-container">
+                <canvas id="monthly-chart"></canvas>
+            </div>
+        </div>
+        
+        <!-- Распределение расходов -->
+        <div class="report-card full-width">
+            <h3>Распределение расходов</h3>
+            <div class="chart-container">
+                <canvas id="expense-pie-chart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
