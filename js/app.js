@@ -8,6 +8,7 @@ class App {
         this.currentTab = 'dashboard';
         this.storage = new Storage();
         this.init();
+        this.setupPWA();
     }
 
     async init() {
@@ -125,6 +126,58 @@ class App {
 
     refreshHeader() {
         this.loadHeader();
+    }
+
+    // ===== PWA =====
+    setupPWA() {
+        let deferredPrompt;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            console.log('✅ PWA: можно установить приложение');
+            this.showInstallButton(deferredPrompt);
+        });
+
+        window.addEventListener('appinstalled', () => {
+            console.log('✅ PWA: приложение установлено');
+            showToast('Приложение установлено!', 'success');
+        });
+    }
+
+    showInstallButton(promptEvent) {
+        const headerRight = document.querySelector('.header-right');
+        if (headerRight && !document.getElementById('pwa-install-btn')) {
+            const btn = document.createElement('button');
+            btn.id = 'pwa-install-btn';
+            btn.textContent = '📲 Установить';
+            btn.style.cssText = `
+                background: var(--color-text);
+                color: var(--color-bg);
+                border: 1px solid var(--color-text);
+                border-radius: var(--radius-sm);
+                padding: 4px 10px;
+                font-family: var(--font-family);
+                font-size: var(--font-size-xs);
+                font-weight: 500;
+                cursor: pointer;
+                transition: var(--transition);
+                white-space: nowrap;
+            `;
+            btn.addEventListener('click', () => {
+                if (promptEvent) {
+                    promptEvent.prompt();
+                    promptEvent.userChoice.then((choiceResult) => {
+                        if (choiceResult.outcome === 'accepted') {
+                            console.log('Пользователь установил приложение');
+                            btn.remove();
+                        } else {
+                            console.log('Пользователь отказался от установки');
+                        }
+                    });
+                }
+            });
+            headerRight.prepend(btn);
+        }
     }
 }
 
