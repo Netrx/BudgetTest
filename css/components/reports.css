@@ -65,6 +65,13 @@
     flex-shrink: 0;
 }
 
+.report-card h4 {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    text-align: center;
+    margin-bottom: var(--spacing-sm);
+}
+
 .report-card .chart-container {
     flex: 1;
     min-height: 200px;
@@ -84,6 +91,17 @@
 
 .report-card.full-width .chart-container {
     min-height: 220px;
+}
+
+.report-card.full-width canvas {
+    max-height: 220px;
+    height: 220px !important;
+}
+
+/* ===== ДВА ГРАФИКА В РЯД ===== */
+.report-card.full-width .chart-container {
+    min-height: 220px;
+    position: relative;
 }
 
 .report-card.full-width canvas {
@@ -196,15 +214,69 @@
     height: 4px;
 }
 
-@keyframes slideDown {
-    from {
-        opacity: 0;
-        transform: translateY(-8px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+/* ===== КНОПКИ В ОТЧЕТАХ ===== */
+.report-card .btn {
+    padding: 6px 16px;
+    background: var(--color-text);
+    color: var(--color-bg);
+    border: 1px solid var(--color-text);
+    border-radius: var(--radius-sm);
+    font-family: var(--font-family);
+    font-size: var(--font-size-xs);
+    font-weight: 500;
+    cursor: pointer;
+    transition: var(--transition);
+    white-space: nowrap;
+}
+
+.report-card .btn:hover {
+    background: var(--color-text-secondary);
+    border-color: var(--color-text-secondary);
+    transform: translateY(-1px);
+}
+
+.report-card .btn-primary {
+    background: var(--color-text);
+    color: var(--color-bg);
+    border-color: var(--color-text);
+}
+
+.report-card .btn-primary:hover {
+    background: var(--color-text-secondary);
+    border-color: var(--color-text-secondary);
+}
+
+/* ===== ФИЛЬТРЫ КАТЕГОРИЙ ===== */
+.category-filter-btn {
+    padding: 4px 10px;
+    border: 1px solid var(--color-border);
+    background: transparent;
+    border-radius: var(--radius-sm);
+    font-family: var(--font-family);
+    font-size: var(--font-size-xs);
+    font-weight: 500;
+    cursor: pointer;
+    transition: var(--transition);
+    white-space: nowrap;
+}
+
+.category-filter-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-sm);
+}
+
+.category-filter-btn.active {
+    background: var(--color-text) !important;
+    color: var(--color-bg) !important;
+    border-color: var(--color-text) !important;
+}
+
+.category-filter-btn.main-cat {
+    font-weight: 600;
+}
+
+.category-filter-btn.sub-cat {
+    font-weight: 400;
 }
 
 /* ===== СОСТОЯНИЯ ===== */
@@ -221,6 +293,17 @@
     display: block;
     margin-bottom: var(--spacing-sm);
     opacity: 0.3;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 /* ===== АДАПТИВНОСТЬ ===== */
@@ -266,6 +349,13 @@
     .report-card.full-width canvas {
         height: 200px !important;
     }
+    
+    /* На мобильных графики в столбец */
+    .reports-grid .report-card.full-width > div[style*="grid-template-columns"] {
+        grid-template-columns: 1fr !important;
+        gap: var(--spacing-md) !important;
+    }
+    
     .category-stat .name {
         min-width: 80px;
         font-size: var(--font-size-xs);
@@ -284,6 +374,11 @@
     }
     #category-stats {
         padding-bottom: var(--spacing-md);
+    }
+    
+    .category-filter-btn {
+        font-size: 10px;
+        padding: 3px 8px;
     }
 }
 
@@ -343,5 +438,10 @@
     }
     #category-stats {
         padding-bottom: var(--spacing-sm);
+    }
+    
+    .category-filter-btn {
+        font-size: 9px;
+        padding: 2px 6px;
     }
 }
