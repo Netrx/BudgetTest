@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>💰 Бюджет</title>
 
+    <!-- ВАЖНО: Базовый путь для GitHub Pages -->
+    <base href="/BudgetTest/">
+
     <!-- PWA Манифест -->
     <link rel="manifest" href="manifest.json" />
 
@@ -48,7 +51,8 @@
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('sw.js')
+                // Используем ./sw.js чтобы браузер искал его в текущей папке BudgetTest/
+                navigator.serviceWorker.register('./sw.js')
                     .then(reg => console.log('SW зарегистрирован:', reg))
                     .catch(err => console.error('Ошибка регистрации SW:', err));
             });
