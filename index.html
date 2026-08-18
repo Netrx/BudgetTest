@@ -5,13 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>💰 Бюджет</title>
 
+    <!-- PWA Манифест -->
     <link rel="manifest" href="/manifest.json" />
+
+    <!-- Иконки для iOS / Android -->
     <link rel="apple-touch-icon" href="/icons/icon-192.png" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Бюджет" />
     <meta name="theme-color" content="#000000" />
 
+    <!-- CSS -->
     <link rel="stylesheet" href="css/variables.css" />
     <link rel="stylesheet" href="css/styles.css" />
     <link rel="stylesheet" href="css/components/header.css" />
@@ -24,8 +28,13 @@
     <link rel="stylesheet" href="css/components/colorPicker.css" />
     <link rel="stylesheet" href="css/components/debts.css" />
 
+    <!-- Шрифты -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+
+    <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+    <!-- Основной скрипт -->
     <script type="module" src="js/app.js"></script>
 </head>
 <body>
@@ -35,6 +44,7 @@
         <aside id="sidebar"></aside>
     </div>
 
+    <!-- Регистрация Service Worker -->
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
