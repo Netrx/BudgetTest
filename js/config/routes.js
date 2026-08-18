@@ -1,22 +1,26 @@
 export const routes = {
     dashboard: {
         title: 'Главная',
-        icon: '▣'  // Квадрат
+        icon: '▣'
     },
     transactions: {
         title: 'Транзакции',
-        icon: '◈'  // Ромб
+        icon: '◈'
     },
     categories: {
         title: 'Категории',
-        icon: '⊞'  // Квадрат с плюсом
+        icon: '⊞'
+    },
+    debts: {
+        title: 'Долги',
+        icon: '◆'
     },
     reports: {
         title: 'Отчеты',
-        icon: '▦'  // Сетка
+        icon: '▦'
     },
     settings: {
         title: 'Настройки',
-        icon: '⚙'  // Шестеренка
+        icon: '⚙'
     }
 };

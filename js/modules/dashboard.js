@@ -52,6 +52,163 @@ function getFilteredTransactions() {
     return allTransactions;
 }
 
+function getCurrentPeriodRange() {
+    const now = new Date();
+
+    switch (currentPeriod) {
+        case 'year':
+            return {
+                start: new Date(now.getFullYear(), 0, 1),
+                end: new Date(now.getFullYear(), 11, 31)
+            };
+        case 'month':
+            return {
+                start: new Date(now.getFullYear(), now.getMonth(), 1),
+                end: new Date(now.getFullYear(), now.getMonth() + 1, 0)
+            };
+        case 'custom':
+            if (customStartDate && customEndDate) {
+                return {
+                    start: new Date(`${customStartDate}T00:00:00`),
+                    end: new Date(`${customEndDate}T23:59:59`)
+                };
+            }
+            return null;
+        case 'all':
+        default:
+            return null;
+    }
+}
+
+function getFilteredDebts() {
+    const data = storageInstance.getData();
+    const debts = data.debts || [];
+    const range = getCurrentPeriodRange();
+    if (!range) return debts;
+
+    return debts.filter(debt => {
+        const sourceDate = debt.dueDate || (debt.createdAt ? debt.createdAt.slice(0, 10) : '');
+        if (!sourceDate) return false;
+        const date = new Date(`${sourceDate}T12:00:00`);
+        return !isNaN(date.getTime()) && date >= range.start && date <= range.end;
+    });
+}
+
+function getDebtPeriodLabel() {
+    const now = new Date();
+    switch (currentPeriod) {
+        case 'year':
+            return `Срок оплаты в ${now.getFullYear()} году`;
+        case 'month':
+            return `Срок оплаты в текущем месяце`;
+        case 'custom':
+            return customStartDate && customEndDate
+                ? `Срок оплаты: ${formatDateShort(customStartDate)} — ${formatDateShort(customEndDate)}`
+                : 'Все долги';
+        case 'all':
+        default:
+            return 'Все долги';
+    }
+}
+
+function getUpcomingDebtReminders() {
+    const data = storageInstance.getData();
+    const debts = data.debts || [];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    return debts
+        .filter(debt => (debt.paidAmount || 0) < debt.amount && debt.dueDate)
+        .map(debt => {
+            const due = new Date(`${debt.dueDate}T00:00:00`);
+            const daysLeft = Math.ceil((due - today) / (1000 * 60 * 60 * 24));
+            return { ...debt, daysLeft };
+        })
+        .filter(debt => debt.daysLeft >= 0 && debt.daysLeft <= 3)
+        .sort((a, b) => a.daysLeft - b.daysLeft);
+}
+
+function renderDebtOverview() {
+    const debts = getFilteredDebts();
+    const total = debts.reduce((sum, debt) => sum + Number(debt.amount || 0), 0);
+    const paid = debts.reduce((sum, debt) => {
+        return sum + Math.min(Number(debt.paidAmount || 0), Number(debt.amount || 0));
+    }, 0);
+    const remaining = Math.max(total - paid, 0);
+
+    const totalEl = document.getElementById('dashboard-debt-total');
+    const paidEl = document.getElementById('dashboard-debt-paid');
+    const remainingEl = document.getElementById('dashboard-debt-remaining');
+    const labelEl = document.getElementById('debt-period-label');
+
+    if (totalEl) totalEl.textContent = total.toFixed(2) + ' ₽';
+    if (paidEl) paidEl.textContent = paid.toFixed(2) + ' ₽';
+    if (remainingEl) remainingEl.textContent = remaining.toFixed(2) + ' ₽';
+    if (labelEl) labelEl.textContent = getDebtPeriodLabel();
+
+    renderDebtReminders();
+}
+
+function renderDebtReminders() {
+    const container = document.getElementById('debt-reminders');
+    const notificationBtn = document.getElementById('enable-debt-notifications');
+    if (!container) return;
+
+    const reminders = getUpcomingDebtReminders();
+    if (!reminders.length) {
+        container.innerHTML = '';
+    } else {
+        container.innerHTML = reminders.map(debt => {
+            const remaining = Math.max(Number(debt.amount || 0) - Number(debt.paidAmount || 0), 0);
+            const dayText = debt.daysLeft === 0
+                ? 'сегодня'
+                : debt.daysLeft === 1
+                    ? 'завтра'
+                    : `через ${debt.daysLeft} дн.`;
+            return `
+                <div class="debt-reminder-item">
+                    <div>
+                        <strong>${debt.title}</strong>
+                        <span>Оплата ${dayText} • ${formatDateShort(debt.dueDate)}</span>
+                    </div>
+                    <b>${remaining.toFixed(2)} ₽</b>
+                </div>
+            `;
+        }).join('');
+    }
+
+    if (notificationBtn) {
+        const canNotify = 'Notification' in window;
+        notificationBtn.style.display = canNotify && Notification.permission === 'default' && reminders.length ? 'inline-flex' : 'none';
+    }
+
+    sendDebtSystemNotification(reminders);
+}
+
+function sendDebtSystemNotification(reminders) {
+    if (!reminders.length || !('Notification' in window) || Notification.permission !== 'granted') return;
+
+    const todayKey = new Date().toISOString().split('T')[0];
+    const debtIds = reminders.map(debt => debt.id).sort().join(',');
+    const notificationKey = `budgetAppDebtReminder:${todayKey}:${debtIds}`;
+    if (localStorage.getItem(notificationKey)) return;
+
+    const totalRemaining = reminders.reduce((sum, debt) => {
+        return sum + Math.max(Number(debt.amount || 0) - Number(debt.paidAmount || 0), 0);
+    }, 0);
+
+    const body = reminders.length === 1
+        ? `${reminders[0].title}: осталось ${totalRemaining.toFixed(2)} ₽, срок ${formatDateShort(reminders[0].dueDate)}`
+        : `${reminders.length} платежа в ближайшие 3 дня. Осталось ${totalRemaining.toFixed(2)} ₽`;
+
+    try {
+        new Notification('Напоминание об оплате долга', { body, tag: 'budget-app-debt-reminder' });
+        localStorage.setItem(notificationKey, '1');
+    } catch (error) {
+        console.warn('Не удалось показать системное уведомление:', error);
+    }
+}
+
 function getDaysInPeriod() {
     const now = new Date();
     let startDate = null;
@@ -133,6 +290,7 @@ function renderDashboard() {
         avgExpenseEl.style.color = '#EF4444';
     }
 
+    renderDebtOverview();
     renderRecentTransactions(transactions.slice(-5).reverse());
     renderChart(transactions);
 }
@@ -163,7 +321,7 @@ function renderRecentTransactions(transactions) {
                         <div class="meta">${formattedDate} • ${t.description || 'Без описания'}</div>
                     </div>
                 </div>
-                <div class="amount" style="color: ${amountColor};">${sign} ${t.amount.toFixed(2)} ₽</div>
+                <div class="amount" style="color: ${amountColor};">${sign} ${Number(t.amount || 0).toFixed(2)} ₽</div>
             </div>
         `;
     }).join('');
@@ -238,13 +396,11 @@ function renderChart(transactions) {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Уничтожаем старый график если есть
     if (chartInstance) {
         chartInstance.destroy();
         chartInstance = null;
     }
 
-    // Если нет данных, показываем сообщение
     if (!transactions.length) {
         const parent = canvas.parentElement;
         const oldMsg = parent.querySelector('.chart-empty-state');
@@ -271,7 +427,6 @@ function renderChart(transactions) {
         return;
     }
 
-    // Удаляем сообщение если есть
     const parent = canvas.parentElement;
     const oldMsg = parent.querySelector('.chart-empty-state');
     if (oldMsg) oldMsg.remove();
@@ -285,10 +440,8 @@ function renderChart(transactions) {
     let incomeData = [];
     let expenseData = [];
 
-    // ===== ЛОГИКА ГРУППИРОВКИ В ЗАВИСИМОСТИ ОТ ПЕРИОДА =====
     switch (currentPeriod) {
         case 'all': {
-            // Все время: 2 столбца - всего доходов и всего расходов
             const totalIncome = transactions
                 .filter(t => t.type === 'income')
                 .reduce((sum, t) => sum + t.amount, 0);
@@ -303,7 +456,6 @@ function renderChart(transactions) {
         }
         
         case 'year': {
-            // Год: группировка по месяцам
             const months = {};
             const monthNames = ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек'];
             
@@ -320,7 +472,6 @@ function renderChart(transactions) {
                 }
             });
             
-            // Сортируем по месяцам
             const sortedMonths = Object.keys(months).sort((a, b) => parseInt(a) - parseInt(b));
             labels = sortedMonths.map(m => months[m].label);
             incomeData = sortedMonths.map(m => months[m].income);
@@ -331,7 +482,6 @@ function renderChart(transactions) {
         case 'month':
         case 'custom':
         default: {
-            // Месяц или кастомный период: группировка по дням
             const days = {};
             
             transactions.forEach(t => {
@@ -347,7 +497,6 @@ function renderChart(transactions) {
             
             const sortedDates = Object.keys(days).sort();
             
-            // Форматируем даты для отображения
             labels = sortedDates.map(d => {
                 const date = new Date(d);
                 return `${date.getDate()}.${String(date.getMonth() + 1).padStart(2, '0')}`;
@@ -358,7 +507,6 @@ function renderChart(transactions) {
         }
     }
 
-    // Проверяем что данные не пустые
     if (!labels.length || (incomeData.every(v => v === 0) && expenseData.every(v => v === 0))) {
         const parent = canvas.parentElement;
         const oldMsg = parent.querySelector('.chart-empty-state');
@@ -385,7 +533,6 @@ function renderChart(transactions) {
         return;
     }
 
-    // Настройка ширины столбцов в зависимости от количества данных
     let barPercentage = 0.6;
     let categoryPercentage = 0.8;
     if (labels.length === 1) {
@@ -493,7 +640,6 @@ function setupEventListeners() {
         btn.addEventListener('click', function(e) {
             const period = this.dataset.period;
             
-            // Обновляем активную кнопку
             periodBtns.forEach(b => b.classList.remove('active'));
             this.classList.add('active');
 
@@ -530,6 +676,26 @@ function setupEventListeners() {
         });
     });
 
+    document.getElementById('enable-debt-notifications')?.addEventListener('click', async function() {
+        if (!('Notification' in window)) {
+            showToast('Системные уведомления не поддерживаются этим браузером', 'error');
+            return;
+        }
+
+        try {
+            const permission = await Notification.requestPermission();
+            if (permission === 'granted') {
+                showToast('Уведомления о долгах включены', 'success');
+                renderDebtReminders();
+            } else {
+                showToast('Разрешение на уведомления не выдано', 'info');
+            }
+        } catch (error) {
+            console.warn('Ошибка запроса уведомлений:', error);
+            showToast('Не удалось включить системные уведомления', 'error');
+        }
+    });
+
     document.getElementById('apply-custom-period')?.addEventListener('click', function() {
         const startInput = document.getElementById('period-start');
         const endInput = document.getElementById('period-end');
@@ -558,6 +724,9 @@ function setupEventListeners() {
         renderDashboard();
     });
     document.addEventListener('transaction-deleted', () => {
+        renderDashboard();
+    });
+    document.addEventListener('debt-updated', () => {
         renderDashboard();
     });
     document.addEventListener('theme-changed', () => {

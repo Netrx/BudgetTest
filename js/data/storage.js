@@ -16,7 +16,8 @@ export class Storage {
                 settings: {
                     currency: 'RUB',
                     theme: 'light'
-                }
+                },
+                debts: []
             };
             localStorage.setItem(this.dbName, JSON.stringify(initialData));
             return;
@@ -36,7 +37,8 @@ export class Storage {
                 expenseCategories: [],
                 incomeCategories: [],
                 debtCategories: [],
-                transactions: oldData.transactions || []
+                transactions: oldData.transactions || [],
+                debts: oldData.debts || []
             };
 
             if (oldData.categories) {
@@ -115,6 +117,7 @@ export class Storage {
                         delete newT.categoryName;
                     }
                     newT.photo = t.photo || '';
+                    newT.isDebtPayment = t.isDebtPayment || false;
                     return newT;
                 });
             }
@@ -131,8 +134,14 @@ export class Storage {
         if (!hasPhotoField && currentData.transactions) {
             currentData.transactions = currentData.transactions.map(t => ({
                 ...t,
-                photo: t.photo || ''
+                photo: t.photo || '',
+                isDebtPayment: t.isDebtPayment || false
             }));
+            needsUpdate = true;
+        }
+
+        if (!currentData.debts) {
+            currentData.debts = [];
             needsUpdate = true;
         }
 
@@ -150,7 +159,9 @@ export class Storage {
     }
 
     getTransactions() {
-        return this.getData().transactions || [];
+        const data = this.getData();
+        console.log('getTransactions - все транзакции:', data.transactions);
+        return data.transactions || [];
     }
 
     getTransaction(id) {
@@ -159,12 +170,62 @@ export class Storage {
 
     addTransaction(transaction) {
         const data = this.getData();
-        transaction.id = Date.now().toString();
-        transaction.date = transaction.date || new Date().toISOString().split('T')[0];
-        transaction.photo = transaction.photo || '';
-        data.transactions.push(transaction);
+        const normalizedTransaction = {
+            ...transaction,
+            id: transaction.id || `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+            amount: Number(transaction.amount || 0),
+            date: transaction.date || new Date().toISOString().split('T')[0],
+            photo: transaction.photo || '',
+            isDebtPayment: Boolean(transaction.isDebtPayment)
+        };
+        data.transactions = Array.isArray(data.transactions) ? data.transactions : [];
+        data.transactions.push(normalizedTransaction);
         this.saveData(data);
-        return transaction;
+        return normalizedTransaction;
+    }
+
+    recordDebtPayment(debtId, payment) {
+        const data = this.getData();
+        data.transactions = Array.isArray(data.transactions) ? data.transactions : [];
+        data.debts = Array.isArray(data.debts) ? data.debts : [];
+
+        const debtIndex = data.debts.findIndex(debt => debt.id === debtId);
+        if (debtIndex === -1) {
+            throw new Error('Долг не найден');
+        }
+
+        const debt = data.debts[debtIndex];
+        const debtAmount = Number(debt.amount || 0);
+        const alreadyPaid = Number(debt.paidAmount || 0);
+        const remaining = Math.max(debtAmount - alreadyPaid, 0);
+        const payAmount = Number(payment.amount || 0);
+
+        if (!Number.isFinite(payAmount) || payAmount <= 0 || payAmount > remaining) {
+            throw new Error('Некорректная сумма погашения');
+        }
+
+        const transaction = {
+            ...payment,
+            id: `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+            type: 'expense',
+            amount: payAmount,
+            date: payment.date || new Date().toISOString().split('T')[0],
+            photo: payment.photo || '',
+            isDebtPayment: true,
+            debtId: debt.id,
+            debtTitle: debt.title
+        };
+
+        data.transactions.push(transaction);
+        debt.paidAmount = Math.min(alreadyPaid + payAmount, debtAmount);
+        debt.transactionIds = Array.isArray(debt.transactionIds) ? debt.transactionIds : [];
+        debt.transactionIds.push(transaction.id);
+        data.debts[debtIndex] = debt;
+
+        // Долг и связанная расходная транзакция сохраняются одним действием.
+        // Благодаря этому страницы «Главная» и «Транзакции» читают один и тот же результат.
+        this.saveData(data);
+        return { transaction, debt };
     }
 
     updateTransaction(id, updatedData) {
@@ -198,7 +259,6 @@ export class Storage {
             .reduce((acc, t) => acc + t.amount, 0);
     }
 
-    // ===== КАТЕГОРИИ (новый формат) =====
     getCategories() {
         const data = this.getData();
         if (data.categories) {
@@ -306,22 +366,18 @@ export class Storage {
         return null;
     }
 
-    // ===== ИЗМЕНЕНИЕ №8: ПЕРЕНАЗНАЧЕНИЕ ТРАНЗАКЦИЙ ПРИ УДАЛЕНИИ КАТЕГОРИИ =====
     deleteCategory(id) {
         const data = this.getData();
         if (!data.categories) {
             data.categories = this.getCategories();
         }
         
-        // Найти все подкатегории удаляемой категории
         const subCategories = data.categories.filter(c => c.parentId === id);
         const allIds = [id, ...subCategories.map(c => c.id)];
         
-        // Проверить, есть ли транзакции у этих категорий
         const hasTransactions = data.transactions.some(t => allIds.includes(t.category));
         
         if (hasTransactions) {
-            // Создать категорию "Без категории" если её нет
             let defaultCat = data.categories.find(c => c.id === 'uncategorized');
             if (!defaultCat) {
                 defaultCat = {
@@ -335,7 +391,6 @@ export class Storage {
                 data.categories.push(defaultCat);
             }
             
-            // Переназначить транзакции на "Без категории"
             data.transactions = data.transactions.map(t => {
                 if (allIds.includes(t.category)) {
                     return {
@@ -348,7 +403,6 @@ export class Storage {
             });
         }
         
-        // Удалить категории
         data.categories = data.categories.filter(c => !allIds.includes(c.id));
         this.saveData(data);
     }

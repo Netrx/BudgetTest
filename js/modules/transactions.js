@@ -1,4 +1,4 @@
-// ===== МОДУЛЬ: ТРАНЗАКЦИИ =====
+// ===== modules/transactions.js =====
 import { openModal } from '../components/modal.js';
 import { showToast } from '../components/toast.js';
 import { formatDateToRussian } from '../utils/dateHelpers.js';
@@ -8,26 +8,48 @@ let currentFilter = 'all';
 
 export function init(storage) {
     storageInstance = storage;
+    currentFilter = 'all';
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.filter === 'all');
+    });
+    // Принудительно загружаем данные напрямую
     renderTransactions();
     setupEventListeners();
+    // Дополнительное обновление после загрузки
+    setTimeout(() => renderTransactions(currentFilter), 500);
 }
 
 function renderTransactions(filter = currentFilter) {
-    let transactions = storageInstance.getTransactions();
+    console.log('=== renderTransactions ===');
+    // Получаем данные напрямую из хранилища
+    const data = storageInstance.getData();
+    let transactions = data.transactions || [];
+    console.log('Все транзакции из data.transactions:', transactions.length);
+    console.log('Первые 5 транзакций:', transactions.slice(0, 5));
+    
+    // Проверяем наличие долговых транзакций
+    const debtTransactions = transactions.filter(t => t.isDebtPayment === true);
+    console.log('Транзакции с isDebtPayment=true:', debtTransactions.length);
+    if (debtTransactions.length > 0) {
+        console.log('Пример долговой транзакции:', debtTransactions[0]);
+    }
     
     if (filter !== 'all') {
         transactions = transactions.filter(t => t.type === filter);
+        console.log(`Отфильтровано по типу "${filter}":`, transactions.length);
     }
     
     const container = document.getElementById('transactions-list');
-    if (!container) return;
+    if (!container) {
+        console.error('Контейнер #transactions-list не найден');
+        return;
+    }
     
     container.innerHTML = '';
-    
     const scrollContainer = document.createElement('div');
     scrollContainer.className = 'list-scroll';
     
-    if (!transactions.length) {
+    if (!transactions || transactions.length === 0) {
         scrollContainer.innerHTML = `
             <div class="empty-state">
                 <span class="icon">◻</span>
@@ -40,24 +62,50 @@ function renderTransactions(filter = currentFilter) {
         return;
     }
     
-    scrollContainer.innerHTML = transactions.map(t => {
-        const icon = getCategoryIcon(t);
-        const color = getCategoryColor(t);
+    // Сортируем по дате (новые сверху)
+    transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
+    
+    let html = '';
+    transactions.forEach(t => {
+        // Определяем категорию и имя
+        let categoryName = t.categoryName || t.subcategoryName || 'Без категории';
+        let categoryIcon = '◻';
+        let categoryColor = '#666666';
+        
+        // Пытаемся получить категорию по ID
+        let catId = t.categoryId || t.category || t.subcategoryId;
+        if (catId) {
+            const category = storageInstance.getCategory(catId);
+            if (category) {
+                categoryIcon = category.icon || '◻';
+                categoryColor = category.color || '#666666';
+                if (!t.categoryName && !t.subcategoryName) {
+                    categoryName = category.name;
+                }
+            }
+        }
+        
+        // Если есть подкатегория, используем её имя
+        if (t.subcategoryName) categoryName = t.subcategoryName;
+        else if (t.categoryName) categoryName = t.categoryName;
+        
         const formattedDate = formatDateToRussian(t.date);
-        const displayName = getCategoryDisplayName(t);
         const hasPhoto = t.photo && t.photo.length > 0;
         const hasComment = t.comment && t.comment.length > 0;
+        const amountColor = t.type === 'income' ? '#22C55E' : '#EF4444';
+        const sign = t.type === 'income' ? '+' : '-';
+        const isDebtPayment = t.isDebtPayment === true;
         
-        return `
+        html += `
             <div class="transaction-item" data-id="${t.id}">
                 <div class="left">
-                    <div class="category-icon" style="color: ${color};">${icon}</div>
+                    <div class="category-icon" style="color: ${categoryColor};">${categoryIcon}</div>
                     <div class="details">
-                        <div class="title" style="color: ${color};">${displayName}</div>
+                        <div class="title" style="color: ${categoryColor};">${categoryName}${isDebtPayment ? ' 🔄' : ''}</div>
                         <div class="meta">${formattedDate} • ${t.description || 'Без описания'}${hasPhoto ? ' 📷' : ''}${hasComment ? ' 💬' : ''}</div>
                     </div>
                 </div>
-                <div class="amount">${t.type === 'income' ? '+' : '-'} ${t.amount.toFixed(2)} ₽</div>
+                <div class="amount" style="color: ${amountColor};">${sign} ${Number(t.amount || 0).toFixed(2)} ₽</div>
                 <div class="actions">
                     ${hasPhoto ? `<button class="btn-photo" data-id="${t.id}" title="Показать фото">🖼</button>` : ''}
                     ${hasComment ? `<button class="btn-comment" data-id="${t.id}" title="Показать комментарий">💬</button>` : ''}
@@ -66,10 +114,12 @@ function renderTransactions(filter = currentFilter) {
                 </div>
             </div>
         `;
-    }).join('');
+    });
     
+    scrollContainer.innerHTML = html;
     container.appendChild(scrollContainer);
     
+    // Обработчики
     document.querySelectorAll('.btn-delete').forEach(btn => {
         btn.addEventListener('click', (e) => {
             const id = e.currentTarget.dataset.id;
@@ -99,89 +149,14 @@ function renderTransactions(filter = currentFilter) {
     });
 }
 
-function getCategoryIcon(transaction) {
-    if (!transaction) return '◻';
-    
-    if (transaction.type === 'income' && transaction.incomeCategoryId) {
-        const cat = storageInstance.getCategory(transaction.incomeCategoryId);
-        if (cat && cat.icon) return cat.icon;
-        return '◻';
-    }
-    
-    if (transaction.type === 'expense' && transaction.categoryId) {
-        if (transaction.subcategoryId) {
-            const sub = storageInstance.getCategory(transaction.subcategoryId);
-            if (sub && sub.icon) return sub.icon;
-        }
-        const cat = storageInstance.getCategory(transaction.categoryId);
-        if (cat && cat.icon) return cat.icon;
-        return '◻';
-    }
-    
-    if (transaction.category) {
-        const cat = storageInstance.getCategory(transaction.category);
-        if (cat && cat.icon) return cat.icon;
-    }
-    
-    return '◻';
-}
-
-function getCategoryColor(transaction) {
-    if (!transaction) return '#666666';
-    
-    if (transaction.type === 'income' && transaction.incomeCategoryId) {
-        const cat = storageInstance.getCategory(transaction.incomeCategoryId);
-        if (cat && cat.color) return cat.color;
-        return '#3B82F6';
-    }
-    
-    if (transaction.type === 'expense' && transaction.categoryId) {
-        if (transaction.subcategoryId) {
-            const sub = storageInstance.getCategory(transaction.subcategoryId);
-            if (sub && sub.color) return sub.color;
-        }
-        const cat = storageInstance.getCategory(transaction.categoryId);
-        if (cat && cat.color) return cat.color;
-        return '#EF4444';
-    }
-    
-    if (transaction.category) {
-        const cat = storageInstance.getCategory(transaction.category);
-        if (cat && cat.color) return cat.color;
-    }
-    
-    return transaction.type === 'income' ? '#3B82F6' : '#EF4444';
-}
-
-function getCategoryDisplayName(transaction) {
-    if (!transaction) return 'Без категории';
-    
-    if (transaction.type === 'income') {
-        if (transaction.incomeCategoryName) return transaction.incomeCategoryName;
-        const cat = storageInstance.getCategory(transaction.incomeCategoryId);
-        return cat ? cat.name : 'Доход';
-    }
-    
-    if (transaction.type === 'expense') {
-        if (transaction.subcategoryName) return transaction.subcategoryName;
-        if (transaction.categoryName) return transaction.categoryName;
-        const cat = storageInstance.getCategory(transaction.categoryId);
-        return cat ? cat.name : 'Расход';
-    }
-    
-    return transaction.categoryName || transaction.category || 'Без категории';
-}
-
 function setupEventListeners() {
     document.getElementById('add-transaction-btn')?.addEventListener('click', openAddModal);
     
     document.querySelectorAll('.filter-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             const filter = e.currentTarget.dataset.filter;
-            
             document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
             e.currentTarget.classList.add('active');
-            
             currentFilter = filter;
             renderTransactions(currentFilter);
         });
@@ -195,15 +170,66 @@ function setupEventListeners() {
             item.style.display = text.includes(query) ? 'flex' : 'none';
         });
     });
+    
+    // Слушаем события обновления
+    document.addEventListener('transaction-added', () => {
+        console.log('Событие transaction-added');
+        renderTransactions(currentFilter);
+    });
+    
+    document.addEventListener('transaction-deleted', () => {
+        console.log('Событие transaction-deleted');
+        renderTransactions(currentFilter);
+    });
+    
+    document.addEventListener('debt-updated', () => {
+        console.log('Событие debt-updated');
+        renderTransactions(currentFilter);
+    });
+    
+    // Следим за изменениями localStorage
+    window.addEventListener('storage', (e) => {
+        if (e.key === storageInstance.dbName) {
+            console.log('Изменение localStorage');
+            renderTransactions(currentFilter);
+        }
+    });
 }
 
-// ===== ИЗМЕНЕНИЕ №3: КАСТОМНОЕ ПОДТВЕРЖДЕНИЕ УДАЛЕНИЯ =====
+function syncLinkedDebt(transaction) {
+    if (!transaction || !transaction.isDebtPayment) return;
+    const data = storageInstance.getData();
+    const debts = data.debts || [];
+    const debtIndex = debts.findIndex(debt =>
+        (transaction.debtId && debt.id === transaction.debtId) ||
+        (Array.isArray(debt.transactionIds) && debt.transactionIds.includes(transaction.id))
+    );
+    if (debtIndex === -1) return;
+    const debt = debts[debtIndex];
+    const allTransactions = data.transactions || [];
+    const linkedTransactions = allTransactions.filter(t =>
+        t.isDebtPayment &&
+        t.type === 'expense' &&
+        ((t.debtId && t.debtId === debt.id) ||
+         (Array.isArray(debt.transactionIds) && debt.transactionIds.includes(t.id)))
+    );
+    debt.transactionIds = linkedTransactions.map(t => t.id);
+    debt.paidAmount = Math.min(
+        linkedTransactions.reduce((sum, t) => sum + Number(t.amount || 0), 0),
+        Number(debt.amount || 0)
+    );
+    debts[debtIndex] = debt;
+    data.debts = debts;
+    storageInstance.saveData(data);
+    document.dispatchEvent(new Event('debt-updated'));
+}
+
 function deleteTransaction(id) {
     const transaction = storageInstance.getTransaction(id);
     if (!transaction) return;
     
-    const displayName = getCategoryDisplayName(transaction);
-    const color = getCategoryColor(transaction);
+    const displayName = transaction.categoryName || transaction.subcategoryName || 'Без категории';
+    const color = '#EF4444';
     
     openModal('Подтверждение удаления', `
         <div style="text-align:center;padding:12px 0;">
@@ -236,21 +262,19 @@ function deleteTransaction(id) {
         </div>
     `, null);
     
-    // Обработчики кнопок
     setTimeout(() => {
         const cancelBtn = document.getElementById('cancel-delete');
         const confirmBtn = document.getElementById('confirm-delete');
-        
         if (cancelBtn) {
             cancelBtn.addEventListener('click', () => {
                 const modal = document.querySelector('.modal-overlay');
                 if (modal) modal.remove();
             });
         }
-        
         if (confirmBtn) {
             confirmBtn.addEventListener('click', () => {
                 storageInstance.deleteTransaction(id);
+                syncLinkedDebt(transaction);
                 renderTransactions(currentFilter);
                 showToast('Транзакция удалена', 'success');
                 window.app.refreshHeader();
@@ -268,7 +292,6 @@ function showPhotoModal(id) {
         showToast('Фото не найдено', 'error');
         return;
     }
-    
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
     modal.style.cssText = `
@@ -285,7 +308,6 @@ function showPhotoModal(id) {
         animation: fadeIn 0.2s ease;
         cursor: pointer;
     `;
-    
     modal.innerHTML = `
         <div style="max-width: 90%; max-height: 90%; position: relative;">
             <button class="modal-close" style="
@@ -314,9 +336,7 @@ function showPhotoModal(id) {
             </div>
         </div>
     `;
-    
     document.body.appendChild(modal);
-    
     const closeModal = () => modal.remove();
     modal.querySelector('.modal-close').addEventListener('click', closeModal);
     modal.addEventListener('click', (e) => {
@@ -330,7 +350,6 @@ function showCommentModal(id) {
         showToast('Комментарий не найден', 'error');
         return;
     }
-    
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
     modal.style.cssText = `
@@ -347,7 +366,6 @@ function showCommentModal(id) {
         z-index: 1000;
         animation: fadeIn 0.2s ease;
     `;
-    
     modal.innerHTML = `
         <div style="
             background: var(--color-bg-card);
@@ -389,9 +407,7 @@ function showCommentModal(id) {
             </div>
         </div>
     `;
-    
     document.body.appendChild(modal);
-    
     const closeModal = () => modal.remove();
     modal.querySelector('.modal-close').addEventListener('click', closeModal);
     modal.addEventListener('click', (e) => {
@@ -401,9 +417,6 @@ function showCommentModal(id) {
 
 function openAddModal() {
     const categories = storageInstance.getCategories();
-    const incomeCategories = categories.filter(c => c.type === 'income' && !c.parentId);
-    const expenseCategories = categories.filter(c => c.type === 'expense' && !c.parentId);
-    
     const today = new Date().toISOString().split('T')[0];
     
     openModal('Добавить транзакцию', `
@@ -484,7 +497,6 @@ function openAddModal() {
         if (formData.subcategory) {
             categoryId = formData.subcategory;
         }
-        
         const category = storageInstance.getCategory(categoryId);
         const transaction = {
             type: formData.type || 'expense',
@@ -494,7 +506,8 @@ function openAddModal() {
             date: formData.date,
             description: formData.description || '',
             comment: formData.comment || '',
-            photo: formData.photo || ''
+            photo: formData.photo || '',
+            isDebtPayment: false
         };
         storageInstance.addTransaction(transaction);
         renderTransactions(currentFilter);
@@ -503,7 +516,7 @@ function openAddModal() {
         document.dispatchEvent(new Event('transaction-added'));
     });
     
-    // Обработчики для кнопок типа транзакции
+    // Обработчики для модалки
     const typeBtns = document.querySelectorAll('.type-btn');
     const categorySelect = document.getElementById('transaction-category');
     const subcategorySelect = document.getElementById('transaction-subcategory');
@@ -557,7 +570,6 @@ function openAddModal() {
             this.classList.add('active');
             this.style.background = 'var(--color-text)';
             this.style.color = 'var(--color-bg)';
-            
             const type = this.dataset.type;
             updateCategoryOptions(type);
         });
@@ -567,21 +579,15 @@ function openAddModal() {
         const categories = storageInstance.getCategories();
         const mainCategories = categories.filter(c => c.type === type && !c.parentId);
         const subCategories = categories.filter(c => c.type === type && c.parentId);
-        
         const mainOptions = mainCategories.map(c => {
             const color = c.color || '#666666';
             return `<option value="${c.id}" data-type="${c.type}" style="color: ${color};">${c.icon || '◻'} ${c.name}</option>`;
         }).join('');
-        
         categorySelect.innerHTML = `
             <option value="">Выберите категорию</option>
             ${mainOptions}
         `;
-        
-        subcategorySelect.innerHTML = `
-            <option value="">Выберите подкатегорию</option>
-        `;
-        
+        subcategorySelect.innerHTML = `<option value="">Выберите подкатегорию</option>`;
         const subMap = {};
         subCategories.forEach(sub => {
             if (!subMap[sub.parentId]) {
@@ -596,16 +602,13 @@ function openAddModal() {
         const selectedId = this.value;
         const subMap = JSON.parse(this.dataset.subMap || '{}');
         const subCategories = subMap[selectedId] || [];
-        
         const type = document.querySelector('.type-btn.active')?.dataset.type || 'expense';
         const categories = storageInstance.getCategories();
         const subs = categories.filter(c => c.type === type && c.parentId === selectedId);
-        
         const subOptions = subs.map(sub => {
             const color = sub.color || '#666666';
             return `<option value="${sub.id}" style="color: ${color};">${sub.name}</option>`;
         }).join('');
-        
         subcategorySelect.innerHTML = `
             <option value="">Выберите подкатегорию</option>
             ${subOptions}
@@ -620,11 +623,9 @@ function openEditModal(id) {
     if (!transaction) return;
     
     const categories = storageInstance.getCategories();
-    
     const selectedCat = categories.find(c => c.id === transaction.category);
     const isSubCategory = selectedCat && selectedCat.parentId;
     const parentId = isSubCategory ? selectedCat.parentId : null;
-    const mainCategoryId = isSubCategory ? parentId : transaction.category;
     const transactionType = transaction.type || 'expense';
     const today = new Date().toISOString().split('T')[0];
     
@@ -731,7 +732,6 @@ function openEditModal(id) {
         if (formData.subcategory) {
             categoryId = formData.subcategory;
         }
-        
         const category = storageInstance.getCategory(categoryId);
         const updated = {
             type: formData.type || 'expense',
@@ -741,16 +741,17 @@ function openEditModal(id) {
             date: formData.date,
             description: formData.description || '',
             comment: formData.comment || '',
-            photo: formData.photo || transaction.photo || ''
+            photo: formData.photo || transaction.photo || '',
+            isDebtPayment: transaction.isDebtPayment || false
         };
-        storageInstance.updateTransaction(id, updated);
+        const savedTransaction = storageInstance.updateTransaction(id, updated);
+        syncLinkedDebt(savedTransaction);
         renderTransactions(currentFilter);
         showToast('Транзакция обновлена', 'success');
         window.app.refreshHeader();
         document.dispatchEvent(new Event('transaction-added'));
     });
     
-    // Обработчики для фото в режиме редактирования
     const photoInput = document.getElementById('photo-input');
     const photoPreview = document.getElementById('photo-preview');
     const previewImage = document.getElementById('preview-image');
@@ -801,7 +802,6 @@ function openEditModal(id) {
         hiddenInput.value = '';
     });
     
-    // Обработчики для кнопок типа транзакции в режиме редактирования
     const typeBtns = document.querySelectorAll('.type-btn');
     const categorySelect = document.getElementById('transaction-category');
     const subcategorySelect = document.getElementById('transaction-subcategory');
@@ -816,7 +816,6 @@ function openEditModal(id) {
             this.classList.add('active');
             this.style.background = 'var(--color-text)';
             this.style.color = 'var(--color-bg)';
-            
             const type = this.dataset.type;
             updateCategoryOptions(type);
         });
@@ -826,21 +825,15 @@ function openEditModal(id) {
         const categories = storageInstance.getCategories();
         const mainCategories = categories.filter(c => c.type === type && !c.parentId);
         const subCategories = categories.filter(c => c.type === type && c.parentId);
-        
         const mainOptions = mainCategories.map(c => {
             const color = c.color || '#666666';
             return `<option value="${c.id}" data-type="${c.type}" style="color: ${color};">${c.icon || '◻'} ${c.name}</option>`;
         }).join('');
-        
         categorySelect.innerHTML = `
             <option value="">Выберите категорию</option>
             ${mainOptions}
         `;
-        
-        subcategorySelect.innerHTML = `
-            <option value="">Выберите подкатегорию</option>
-        `;
-        
+        subcategorySelect.innerHTML = `<option value="">Выберите подкатегорию</option>`;
         const subMap = {};
         subCategories.forEach(sub => {
             if (!subMap[sub.parentId]) {
@@ -855,16 +848,13 @@ function openEditModal(id) {
         const selectedId = this.value;
         const subMap = JSON.parse(this.dataset.subMap || '{}');
         const subCategories = subMap[selectedId] || [];
-        
         const type = document.querySelector('.type-btn.active')?.dataset.type || 'expense';
         const categories = storageInstance.getCategories();
         const subs = categories.filter(c => c.type === type && c.parentId === selectedId);
-        
         const subOptions = subs.map(sub => {
             const color = sub.color || '#666666';
             return `<option value="${sub.id}" style="color: ${color};">${sub.name}</option>`;
         }).join('');
-        
         subcategorySelect.innerHTML = `
             <option value="">Выберите подкатегорию</option>
             ${subOptions}
