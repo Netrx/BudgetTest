@@ -6,10 +6,10 @@
     <title>💰 Бюджет</title>
 
     <!-- PWA Манифест -->
-    <link rel="manifest" href="/manifest.json" />
+    <link rel="manifest" href="manifest.json" />
 
     <!-- Иконки для iOS / Android -->
-    <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+    <link rel="apple-touch-icon" href="icons/icon-192.png" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Бюджет" />
@@ -18,15 +18,15 @@
     <!-- CSS -->
     <link rel="stylesheet" href="css/variables.css" />
     <link rel="stylesheet" href="css/styles.css" />
-    <link rel="stylesheet" href="css/components/header.css" />
-    <link rel="stylesheet" href="css/components/sidebar.css" />
-    <link rel="stylesheet" href="css/components/dashboard.css" />
-    <link rel="stylesheet" href="css/components/transactions.css" />
-    <link rel="stylesheet" href="css/components/categories.css" />
-    <link rel="stylesheet" href="css/components/reports.css" />
-    <link rel="stylesheet" href="css/components/settings.css" />
-    <link rel="stylesheet" href="css/components/colorPicker.css" />
-    <link rel="stylesheet" href="css/components/debts.css" />
+    <link rel="stylesheet" href="css/header.css" />
+    <link rel="stylesheet" href="css/sidebar.css" />
+    <link rel="stylesheet" href="css/dashboard.css" />
+    <link rel="stylesheet" href="css/transactions.css" />
+    <link rel="stylesheet" href="css/categories.css" />
+    <link rel="stylesheet" href="css/reports.css" />
+    <link rel="stylesheet" href="css/settings.css" />
+    <link rel="stylesheet" href="css/colorPicker.css" />
+    <link rel="stylesheet" href="css/debts.css" />
 
     <!-- Шрифты -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -48,7 +48,7 @@
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw.js')
+                navigator.serviceWorker.register('sw.js')
                     .then(reg => console.log('SW зарегистрирован:', reg))
                     .catch(err => console.error('Ошибка регистрации SW:', err));
             });
