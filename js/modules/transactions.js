@@ -25,6 +25,17 @@ function renderTransactions(filter = currentFilter) {
         transactions = transactions.filter(t => t.type === filter);
     }
     
+    // ===== ИЗМЕНЕНИЕ: Сортируем по ID (новые сверху) =====
+    // ID генерируется как Date.now() + рандом, поэтому строковое сравнение работает корректно.
+    transactions.sort((a, b) => {
+        // Если ID совпадают (маловероятно), сортируем по дате
+        if (a.id === b.id) {
+            return new Date(b.date) - new Date(a.date);
+        }
+        // Сначала идут более новые (больший ID)
+        return b.id.localeCompare(a.id);
+    });
+    
     const container = document.getElementById('transactions-list');
     if (!container) return;
     
@@ -44,8 +55,6 @@ function renderTransactions(filter = currentFilter) {
         document.getElementById('add-first-btn')?.addEventListener('click', openAddModal);
         return;
     }
-    
-    transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
     
     let html = '';
     transactions.forEach(t => {
@@ -457,7 +466,6 @@ function openAddModal() {
             <button type="submit" class="btn btn-primary" style="width:100%;padding:10px;">Сохранить</button>
         </form>
     `, (formData) => {
-        // === ГЛАВНОЕ ИСПРАВЛЕНИЕ: ЯВНО БЕРЁМ ТИП ИЗ КНОПОК ===
         const activeTypeBtn = document.querySelector('.type-btn.active');
         const selectedType = activeTypeBtn ? activeTypeBtn.dataset.type : 'expense';
         
@@ -467,7 +475,7 @@ function openAddModal() {
         }
         const category = storageInstance.getCategory(categoryId);
         const transaction = {
-            type: selectedType, // Теперь тип сохраняется корректно
+            type: selectedType,
             amount: parseFloat(formData.amount),
             category: categoryId,
             categoryName: category ? category.name : formData.category,
@@ -484,7 +492,6 @@ function openAddModal() {
         document.dispatchEvent(new Event('transaction-added'));
     });
     
-    // Обработчики для модалки
     const typeBtns = document.querySelectorAll('.type-btn');
     const categorySelect = document.getElementById('transaction-category');
     const subcategorySelect = document.getElementById('transaction-subcategory');
@@ -696,7 +703,6 @@ function openEditModal(id) {
             <button type="submit" class="btn btn-primary" style="width:100%;padding:10px;">Обновить</button>
         </form>
     `, (formData) => {
-        // === ГЛАВНОЕ ИСПРАВЛЕНИЕ: ЯВНО БЕРЁМ ТИП ИЗ КНОПОК ===
         const activeTypeBtn = document.querySelector('.type-btn.active');
         const selectedType = activeTypeBtn ? activeTypeBtn.dataset.type : 'expense';
         
@@ -706,7 +712,7 @@ function openEditModal(id) {
         }
         const category = storageInstance.getCategory(categoryId);
         const updated = {
-            type: selectedType, // Теперь тип сохраняется корректно
+            type: selectedType,
             amount: parseFloat(formData.amount),
             category: categoryId,
             categoryName: category ? category.name : formData.category,
