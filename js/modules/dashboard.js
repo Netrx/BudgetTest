@@ -4,7 +4,8 @@ import { formatDateToRussian } from '../utils/dateHelpers.js';
 
 let storageInstance = null;
 let chartInstance = null;
-let currentPeriod = 'all';
+// ИЗМЕНЕНИЕ: по умолчанию ставим 'month' вместо 'all'
+let currentPeriod = 'month'; 
 let customStartDate = null;
 let customEndDate = null;
 
@@ -86,7 +87,6 @@ function getFilteredDebts() {
     const range = getCurrentPeriodRange();
     let filtered = debts;
     
-    // Фильтруем по showOnDashboard (по умолчанию true, если поле отсутствует)
     filtered = filtered.filter(debt => debt.showOnDashboard !== false);
     
     if (!range) return filtered;
@@ -640,6 +640,21 @@ function renderChart(transactions) {
 function setupEventListeners() {
     const periodBtns = document.querySelectorAll('.period-btn');
     const customInputs = document.querySelector('.custom-period-inputs');
+    
+    // ИЗМЕНЕНИЕ: принудительно активируем кнопку "Месяц" при загрузке
+    setTimeout(() => {
+        const monthBtn = document.querySelector('.period-btn[data-period="month"]');
+        if (monthBtn) {
+            // Снимаем активность со всех
+            periodBtns.forEach(b => b.classList.remove('active'));
+            // Активируем месяц
+            monthBtn.classList.add('active');
+            // Если есть кастомные инпуты, скрываем их
+            if (customInputs) customInputs.style.display = 'none';
+        }
+        // Перерисовываем дашборд с учетом нового периода
+        renderDashboard();
+    }, 100);
     
     periodBtns.forEach(btn => {
         btn.addEventListener('click', function(e) {
