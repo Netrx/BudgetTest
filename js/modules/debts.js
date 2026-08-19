@@ -232,7 +232,6 @@ function renderDebts() {
         `;
     }).join('');
 
-    // Обработчики для кнопок
     document.querySelectorAll('.btn-toggle-visibility').forEach(btn => {
         btn.addEventListener('click', (e) => {
             const id = e.currentTarget.dataset.id;
@@ -701,11 +700,11 @@ function openPayDebtModal(id, mode = 'full') {
             return;
         }
 
-        // ДОБАВЛЯЕМ ТРАНЗАКЦИЮ
+        // 1. СОЗДАЁМ ТРАНЗАКЦИЮ
         const category = storageInstance.getCategory(debt.categoryId);
         const subcategory = debt.subcategoryId ? storageInstance.getCategory(debt.subcategoryId) : null;
         
-        const transaction = {
+        const transactionData = {
             type: 'expense',
             amount: payAmount,
             category: debt.subcategoryId || debt.categoryId,
@@ -717,10 +716,10 @@ function openPayDebtModal(id, mode = 'full') {
             isDebtPayment: true
         };
         
-        // Сохраняем транзакцию
-        const savedTransaction = storageInstance.addTransaction(transaction);
-        
-        // Обновляем долг
+        // Сохраняем в storage
+        const savedTransaction = storageInstance.addTransaction(transactionData);
+
+        // 2. ОБНОВЛЯЕМ ДОЛГ
         const debts = getDebts();
         const index = debts.findIndex(d => d.id === id);
         if (index === -1) {
@@ -731,7 +730,7 @@ function openPayDebtModal(id, mode = 'full') {
         // Увеличиваем оплаченную сумму
         debts[index].paidAmount = (debts[index].paidAmount || 0) + payAmount;
         
-        // Сохраняем ID транзакции в долг
+        // Сохраняем ID транзакции
         if (!debts[index].transactionIds) {
             debts[index].transactionIds = [];
         }
@@ -812,7 +811,9 @@ function resetDebt(id) {
                 deletedCount++;
             }
         });
-        showToast(`Удалено ${deletedCount} транзакций`, 'info');
+        if (deletedCount > 0) {
+            showToast(`Удалено ${deletedCount} транзакций`, 'info');
+        }
     }
 
     debts[index].paidAmount = 0;
