@@ -12,38 +12,21 @@ export function init(storage) {
     document.querySelectorAll('.filter-btn').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.filter === 'all');
     });
-    // Принудительно загружаем данные напрямую
     renderTransactions();
     setupEventListeners();
-    // Дополнительное обновление после загрузки
     setTimeout(() => renderTransactions(currentFilter), 500);
 }
 
 function renderTransactions(filter = currentFilter) {
-    console.log('=== renderTransactions ===');
-    // Получаем данные напрямую из хранилища
     const data = storageInstance.getData();
     let transactions = data.transactions || [];
-    console.log('Все транзакции из data.transactions:', transactions.length);
-    console.log('Первые 5 транзакций:', transactions.slice(0, 5));
-    
-    // Проверяем наличие долговых транзакций
-    const debtTransactions = transactions.filter(t => t.isDebtPayment === true);
-    console.log('Транзакции с isDebtPayment=true:', debtTransactions.length);
-    if (debtTransactions.length > 0) {
-        console.log('Пример долговой транзакции:', debtTransactions[0]);
-    }
     
     if (filter !== 'all') {
         transactions = transactions.filter(t => t.type === filter);
-        console.log(`Отфильтровано по типу "${filter}":`, transactions.length);
     }
     
     const container = document.getElementById('transactions-list');
-    if (!container) {
-        console.error('Контейнер #transactions-list не найден');
-        return;
-    }
+    if (!container) return;
     
     container.innerHTML = '';
     const scrollContainer = document.createElement('div');
@@ -62,17 +45,14 @@ function renderTransactions(filter = currentFilter) {
         return;
     }
     
-    // Сортируем по дате (новые сверху)
     transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
     
     let html = '';
     transactions.forEach(t => {
-        // Определяем категорию и имя
         let categoryName = t.categoryName || t.subcategoryName || 'Без категории';
         let categoryIcon = '◻';
         let categoryColor = '#666666';
         
-        // Пытаемся получить категорию по ID
         let catId = t.categoryId || t.category || t.subcategoryId;
         if (catId) {
             const category = storageInstance.getCategory(catId);
@@ -85,7 +65,6 @@ function renderTransactions(filter = currentFilter) {
             }
         }
         
-        // Если есть подкатегория, используем её имя
         if (t.subcategoryName) categoryName = t.subcategoryName;
         else if (t.categoryName) categoryName = t.categoryName;
         
@@ -119,7 +98,6 @@ function renderTransactions(filter = currentFilter) {
     scrollContainer.innerHTML = html;
     container.appendChild(scrollContainer);
     
-    // Обработчики
     document.querySelectorAll('.btn-delete').forEach(btn => {
         btn.addEventListener('click', (e) => {
             const id = e.currentTarget.dataset.id;
@@ -171,26 +149,12 @@ function setupEventListeners() {
         });
     });
     
-    // Слушаем события обновления
-    document.addEventListener('transaction-added', () => {
-        console.log('Событие transaction-added');
-        renderTransactions(currentFilter);
-    });
+    document.addEventListener('transaction-added', () => renderTransactions(currentFilter));
+    document.addEventListener('transaction-deleted', () => renderTransactions(currentFilter));
+    document.addEventListener('debt-updated', () => renderTransactions(currentFilter));
     
-    document.addEventListener('transaction-deleted', () => {
-        console.log('Событие transaction-deleted');
-        renderTransactions(currentFilter);
-    });
-    
-    document.addEventListener('debt-updated', () => {
-        console.log('Событие debt-updated');
-        renderTransactions(currentFilter);
-    });
-    
-    // Следим за изменениями localStorage
     window.addEventListener('storage', (e) => {
         if (e.key === storageInstance.dbName) {
-            console.log('Изменение localStorage');
             renderTransactions(currentFilter);
         }
     });
@@ -493,13 +457,17 @@ function openAddModal() {
             <button type="submit" class="btn btn-primary" style="width:100%;padding:10px;">Сохранить</button>
         </form>
     `, (formData) => {
+        // === ГЛАВНОЕ ИСПРАВЛЕНИЕ: ЯВНО БЕРЁМ ТИП ИЗ КНОПОК ===
+        const activeTypeBtn = document.querySelector('.type-btn.active');
+        const selectedType = activeTypeBtn ? activeTypeBtn.dataset.type : 'expense';
+        
         let categoryId = formData.category;
         if (formData.subcategory) {
             categoryId = formData.subcategory;
         }
         const category = storageInstance.getCategory(categoryId);
         const transaction = {
-            type: formData.type || 'expense',
+            type: selectedType, // Теперь тип сохраняется корректно
             amount: parseFloat(formData.amount),
             category: categoryId,
             categoryName: category ? category.name : formData.category,
@@ -728,13 +696,17 @@ function openEditModal(id) {
             <button type="submit" class="btn btn-primary" style="width:100%;padding:10px;">Обновить</button>
         </form>
     `, (formData) => {
+        // === ГЛАВНОЕ ИСПРАВЛЕНИЕ: ЯВНО БЕРЁМ ТИП ИЗ КНОПОК ===
+        const activeTypeBtn = document.querySelector('.type-btn.active');
+        const selectedType = activeTypeBtn ? activeTypeBtn.dataset.type : 'expense';
+        
         let categoryId = formData.category;
         if (formData.subcategory) {
             categoryId = formData.subcategory;
         }
         const category = storageInstance.getCategory(categoryId);
         const updated = {
-            type: formData.type || 'expense',
+            type: selectedType, // Теперь тип сохраняется корректно
             amount: parseFloat(formData.amount),
             category: categoryId,
             categoryName: category ? category.name : formData.category,
