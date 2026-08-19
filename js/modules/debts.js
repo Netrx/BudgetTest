@@ -701,17 +701,7 @@ function openPayDebtModal(id, mode = 'full') {
             return;
         }
 
-        const debts = getDebts();
-        const index = debts.findIndex(d => d.id === id);
-        if (index === -1) {
-            showToast('Долг не найден', 'error');
-            return;
-        }
-
-        debts[index].paidAmount = (debts[index].paidAmount || 0) + payAmount;
-        saveDebts(debts);
-        renderDebts();
-
+        // ДОБАВЛЯЕМ ТРАНЗАКЦИЮ
         const category = storageInstance.getCategory(debt.categoryId);
         const subcategory = debt.subcategoryId ? storageInstance.getCategory(debt.subcategoryId) : null;
         
@@ -727,15 +717,30 @@ function openPayDebtModal(id, mode = 'full') {
             isDebtPayment: true
         };
         
+        // Сохраняем транзакцию
         const savedTransaction = storageInstance.addTransaction(transaction);
         
-        if (savedTransaction && savedTransaction.id) {
-            if (!debts[index].transactionIds) {
-                debts[index].transactionIds = [];
-            }
-            debts[index].transactionIds.push(savedTransaction.id);
-            saveDebts(debts);
+        // Обновляем долг
+        const debts = getDebts();
+        const index = debts.findIndex(d => d.id === id);
+        if (index === -1) {
+            showToast('Долг не найден', 'error');
+            return;
         }
+
+        // Увеличиваем оплаченную сумму
+        debts[index].paidAmount = (debts[index].paidAmount || 0) + payAmount;
+        
+        // Сохраняем ID транзакции в долг
+        if (!debts[index].transactionIds) {
+            debts[index].transactionIds = [];
+        }
+        if (savedTransaction && savedTransaction.id) {
+            debts[index].transactionIds.push(savedTransaction.id);
+        }
+        
+        saveDebts(debts);
+        renderDebts();
         
         showToast(`Погашено ${payAmount.toFixed(2)} ₽`, 'success');
         document.dispatchEvent(new Event('transaction-added'));
@@ -760,6 +765,7 @@ function restoreDebt(id) {
         return;
     }
 
+    // Удаляем связанные транзакции
     if (debt.transactionIds && debt.transactionIds.length > 0) {
         let deletedCount = 0;
         debt.transactionIds.forEach(transactionId => {
@@ -788,63 +794,30 @@ function resetDebt(id) {
     const debt = debts.find(d => d.id === id);
     if (!debt) return;
 
-    // Если долг периодический, проверяем есть ли транзакции за последний период
-    const isRepeating = debt.repeatEnabled && debt.lastRepeatDate;
-    let transactionsToDelete = [];
+    if (!confirm(`Обнулить долг "${debt.title}"? Все связанные транзакции будут удалены.`)) return;
 
-    if (debt.transactionIds && debt.transactionIds.length > 0) {
-        // Получаем все транзакции
-        const allTransactions = debt.transactionIds
-            .map(tid => storageInstance.getTransaction(tid))
-            .filter(t => t !== null);
-
-        if (isRepeating) {
-            // Для периодического долга — удаляем только за последний период
-            const lastPeriodDate = new Date(debt.lastRepeatDate);
-            const periodStart = new Date(lastPeriodDate);
-            periodStart.setDate(1); // Начало месяца
-            const periodEnd = new Date(lastPeriodDate);
-            periodEnd.setMonth(periodEnd.getMonth() + 1);
-            periodEnd.setDate(0); // Конец месяца
-
-            transactionsToDelete = allTransactions.filter(t => {
-                const tDate = new Date(t.date);
-                return tDate >= periodStart && tDate <= periodEnd;
-            });
-
-            // Если транзакций за период нет, удаляем последние 3
-            if (transactionsToDelete.length === 0) {
-                transactionsToDelete = allTransactions.slice(-3);
-            }
-        } else {
-            // Для обычного долга — удаляем всё
-            transactionsToDelete = allTransactions;
-        }
+    const index = debts.findIndex(d => d.id === id);
+    if (index === -1) {
+        showToast('Долг не найден', 'error');
+        return;
     }
 
-    let deletedCount = 0;
-    if (transactionsToDelete.length > 0) {
-        transactionsToDelete.forEach(transaction => {
+    // Удаляем ВСЕ связанные транзакции
+    if (debt.transactionIds && debt.transactionIds.length > 0) {
+        let deletedCount = 0;
+        debt.transactionIds.forEach(transactionId => {
+            const transaction = storageInstance.getTransaction(transactionId);
             if (transaction) {
-                storageInstance.deleteTransaction(transaction.id);
+                storageInstance.deleteTransaction(transactionId);
                 deletedCount++;
             }
         });
         showToast(`Удалено ${deletedCount} транзакций`, 'info');
     }
 
-    // Обнуляем долг
-    const index = debts.findIndex(d => d.id === id);
-    if (index !== -1) {
-        debts[index].paidAmount = 0;
-        debts[index].transactionIds = [];
-        // Если периодический — сбрасываем дату последнего повтора на текущую
-        if (isRepeating) {
-            debts[index].lastRepeatDate = new Date().toISOString().split('T')[0];
-        }
-        saveDebts(debts);
-    }
-
+    debts[index].paidAmount = 0;
+    debts[index].transactionIds = [];
+    saveDebts(debts);
     renderDebts();
     document.dispatchEvent(new Event('debt-updated'));
     showToast(`Долг "${debt.title}" обнулен`, 'success');
