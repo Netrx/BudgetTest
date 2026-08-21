@@ -56,6 +56,28 @@ function setupEventListeners() {
     document.getElementById('import-data')?.addEventListener('click', () => document.getElementById('import-file')?.click());
     document.getElementById('import-file')?.addEventListener('change', importData);
     document.getElementById('clear-data')?.addEventListener('click', clearAllData);
+    
+    // ===== ИЗМЕНЕНИЕ: Обработчик сворачивания/разворачивания опасной зоны =====
+    document.getElementById('danger-zone-toggle')?.addEventListener('click', () => {
+        const content = document.getElementById('danger-zone-content');
+        const icon = document.getElementById('danger-zone-icon');
+        
+        if (content) {
+            if (content.style.display === 'none') {
+                content.style.display = 'block';
+                if (icon) {
+                    icon.textContent = '▲';
+                    icon.style.transform = 'rotate(180deg)';
+                }
+            } else {
+                content.style.display = 'none';
+                if (icon) {
+                    icon.textContent = '▼';
+                    icon.style.transform = 'rotate(0deg)';
+                }
+            }
+        }
+    });
 }
 
 function exportData() {

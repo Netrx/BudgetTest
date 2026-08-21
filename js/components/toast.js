@@ -10,11 +10,13 @@ export function showToast(message, type = 'info') {
         clearTimeout(toastTimeout);
     }
     
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    
     const colors = {
-        success: '#000000',
-        error: '#000000',
-        warning: '#000000',
-        info: '#666666'
+        success: isDark ? '#22C55E' : '#000000',
+        error: isDark ? '#EF4444' : '#000000',
+        warning: isDark ? '#F59E0B' : '#000000',
+        info: isDark ? '#FFFFFF' : '#666666'
     };
     
     const toast = document.createElement('div');

@@ -180,7 +180,7 @@ function renderDebts() {
         const categoryName = subcategory?.name || category?.name || 'Без категории';
         const repeatLabel = getRepeatLabel(debt.repeatType, debt.repeatInterval);
         const hasTransactions = debt.transactionIds && debt.transactionIds.length > 0;
-        const showOnDashboard = debt.showOnDashboard !== false;
+        const showOnDashboard = debt.showOnDashboard !== false; // undefined => true
 
         return `
             <div class="debt-card" data-debt-id="${debt.id}">
@@ -232,6 +232,7 @@ function renderDebts() {
         `;
     }).join('');
 
+    // Обработчики для кнопок
     document.querySelectorAll('.btn-toggle-visibility').forEach(btn => {
         btn.addEventListener('click', (e) => {
             const id = e.currentTarget.dataset.id;
@@ -642,6 +643,7 @@ function openEditDebtModal(id) {
     }, 100);
 }
 
+// ===== ИСПРАВЛЕНИЕ: Функция openPayDebtModal =====
 function openPayDebtModal(id, mode = 'full') {
     const debts = getDebts();
     const debt = debts.find(d => d.id === id);
@@ -700,11 +702,22 @@ function openPayDebtModal(id, mode = 'full') {
             return;
         }
 
-        // 1. СОЗДАЁМ ТРАНЗАКЦИЮ
+        const debts = getDebts();
+        const index = debts.findIndex(d => d.id === id);
+        if (index === -1) {
+            showToast('Долг не найден', 'error');
+            return;
+        }
+
+        debts[index].paidAmount = (debts[index].paidAmount || 0) + payAmount;
+        saveDebts(debts);
+        renderDebts();
+
         const category = storageInstance.getCategory(debt.categoryId);
         const subcategory = debt.subcategoryId ? storageInstance.getCategory(debt.subcategoryId) : null;
         
-        const transactionData = {
+        // ===== ИСПРАВЛЕНИЕ: Правильное создание транзакции =====
+        const transaction = {
             type: 'expense',
             amount: payAmount,
             category: debt.subcategoryId || debt.categoryId,
@@ -716,34 +729,27 @@ function openPayDebtModal(id, mode = 'full') {
             isDebtPayment: true
         };
         
-        // Сохраняем в storage
-        const savedTransaction = storageInstance.addTransaction(transactionData);
-
-        // 2. ОБНОВЛЯЕМ ДОЛГ
-        const debts = getDebts();
-        const index = debts.findIndex(d => d.id === id);
-        if (index === -1) {
-            showToast('Долг не найден', 'error');
-            return;
-        }
-
-        // Увеличиваем оплаченную сумму
-        debts[index].paidAmount = (debts[index].paidAmount || 0) + payAmount;
+        // Добавляем транзакцию
+        const savedTransaction = storageInstance.addTransaction(transaction);
         
-        // Сохраняем ID транзакции
-        if (!debts[index].transactionIds) {
-            debts[index].transactionIds = [];
-        }
         if (savedTransaction && savedTransaction.id) {
+            if (!debts[index].transactionIds) {
+                debts[index].transactionIds = [];
+            }
             debts[index].transactionIds.push(savedTransaction.id);
+            saveDebts(debts);
         }
-        
-        saveDebts(debts);
-        renderDebts();
         
         showToast(`Погашено ${payAmount.toFixed(2)} ₽`, 'success');
+        
+        // ===== ИСПРАВЛЕНИЕ: Обновляем всё =====
         document.dispatchEvent(new Event('transaction-added'));
         document.dispatchEvent(new Event('debt-updated'));
+        
+        // Обновляем шапку с балансом
+        if (window.app && window.app.refreshHeader) {
+            window.app.refreshHeader();
+        }
         
         if (debts[index].paidAmount >= debts[index].amount) {
             showToast(`Долг "${debt.title}" полностью погашен! 🎉`, 'success');
@@ -764,7 +770,6 @@ function restoreDebt(id) {
         return;
     }
 
-    // Удаляем связанные транзакции
     if (debt.transactionIds && debt.transactionIds.length > 0) {
         let deletedCount = 0;
         debt.transactionIds.forEach(transactionId => {
@@ -786,6 +791,11 @@ function restoreDebt(id) {
     document.dispatchEvent(new Event('debt-updated'));
     showToast(`Долг "${debt.title}" возвращен в активные`, 'success');
     document.dispatchEvent(new Event('transaction-deleted'));
+    
+    // Обновляем шапку с балансом
+    if (window.app && window.app.refreshHeader) {
+        window.app.refreshHeader();
+    }
 }
 
 function resetDebt(id) {
@@ -801,7 +811,6 @@ function resetDebt(id) {
         return;
     }
 
-    // Удаляем ВСЕ связанные транзакции
     if (debt.transactionIds && debt.transactionIds.length > 0) {
         let deletedCount = 0;
         debt.transactionIds.forEach(transactionId => {
@@ -811,9 +820,7 @@ function resetDebt(id) {
                 deletedCount++;
             }
         });
-        if (deletedCount > 0) {
-            showToast(`Удалено ${deletedCount} транзакций`, 'info');
-        }
+        showToast(`Удалено ${deletedCount} транзакций`, 'info');
     }
 
     debts[index].paidAmount = 0;
@@ -823,6 +830,11 @@ function resetDebt(id) {
     document.dispatchEvent(new Event('debt-updated'));
     showToast(`Долг "${debt.title}" обнулен`, 'success');
     document.dispatchEvent(new Event('transaction-deleted'));
+    
+    // Обновляем шапку с балансом
+    if (window.app && window.app.refreshHeader) {
+        window.app.refreshHeader();
+    }
 }
 
 function deleteDebt(id) {
@@ -851,5 +863,10 @@ function deleteDebt(id) {
         document.dispatchEvent(new Event('debt-updated'));
         showToast('Долг удален', 'success');
         document.dispatchEvent(new Event('transaction-deleted'));
+        
+        // Обновляем шапку с балансом
+        if (window.app && window.app.refreshHeader) {
+            window.app.refreshHeader();
+        }
     }
 }

@@ -296,10 +296,11 @@ function renderDashboard() {
     }
 
     renderDebtOverview();
-    renderRecentTransactions(transactions.slice(-5).reverse());
+    renderRecentTransactions(transactions);
     renderChart(transactions);
 }
 
+// ===== ФУНКЦИЯ: renderRecentTransactions =====
 function renderRecentTransactions(transactions) {
     const container = document.getElementById('recent-transactions');
     if (!container) return;
@@ -309,11 +310,59 @@ function renderRecentTransactions(transactions) {
         return;
     }
 
-    container.innerHTML = transactions.map(t => {
+    // ===== ИСПРАВЛЕНИЕ: Сортируем так же, как на странице транзакций =====
+    const sortedTransactions = [...transactions].sort((a, b) => {
+        // 1. Сначала сравниваем дату транзакции (более новые сверху)
+        const dateA = new Date(a.date || '1970-01-01');
+        const dateB = new Date(b.date || '1970-01-01');
+        
+        const dateDiff = dateB - dateA;
+        if (dateDiff !== 0) {
+            return dateDiff;
+        }
+        
+        // 2. Если даты одинаковые, сравниваем по времени создания записи
+        const idA = extractTimestamp(a.id);
+        const idB = extractTimestamp(b.id);
+        
+        // Более новые записи (с большим timestamp) идут сверху
+        return idB - idA;
+    });
+
+    // Показываем последние 5 транзакций
+    const recentTransactions = sortedTransactions.slice(0, 5);
+
+    // ===== ИСПРАВЛЕНИЕ: Формат отображения "Родительская категория (Подкатегория)" =====
+    container.innerHTML = recentTransactions.map(t => {
+        const catId = t.categoryId || t.category || t.subcategoryId;
+        const category = catId ? storageInstance.getCategory(catId) : null;
+        
+        // Определяем родительскую и подкатегорию
+        let parentName = t.categoryName || '';
+        let subName = t.subcategoryName || '';
+        
+        if (category) {
+            if (category.parentId) {
+                // Это подкатегория - ищем родителя
+                const parentCategory = storageInstance.getCategory(category.parentId);
+                parentName = parentCategory?.name || t.categoryName || '';
+                subName = category.name;
+            } else {
+                // Это родительская категория
+                parentName = category.name;
+                subName = '';
+            }
+        }
+        
+        // Формируем отображаемое имя
+        let displayName = parentName || 'Без категории';
+        if (subName) {
+            displayName = `${parentName} (${subName})`;
+        }
+        
         const icon = getCategoryIcon(t);
         const color = getCategoryColor(t);
         const formattedDate = formatDateToRussian(t.date);
-        const displayName = getCategoryDisplayName(t);
         const amountColor = t.type === 'income' ? '#22C55E' : '#EF4444';
         const sign = t.type === 'income' ? '+' : '-';
         
@@ -332,6 +381,27 @@ function renderRecentTransactions(transactions) {
     }).join('');
 }
 
+/**
+ * Извлекает временную метку (timestamp) из ID транзакции
+ * ID имеет формат: ${Date.now()}_${random}
+ * Например: 1690000000000_abc123
+ * Возвращает число (timestamp) или 0, если не удалось извлечь
+ */
+function extractTimestamp(id) {
+    if (!id) return 0;
+    
+    const match = String(id).match(/^(\d+)_/);
+    if (match) {
+        return parseInt(match[1], 10) || 0;
+    }
+    
+    if (/^\d+$/.test(String(id))) {
+        return parseInt(id, 10) || 0;
+    }
+    
+    return 0;
+}
+
 function getCategoryIcon(transaction) {
     if (!transaction) return '◻';
     
@@ -343,11 +413,6 @@ function getCategoryIcon(transaction) {
     
     if (cat && cat.icon) {
         return cat.icon;
-    }
-    
-    const defaultCat = DEFAULT_CATEGORIES.find(c => c.id === categoryId);
-    if (defaultCat && defaultCat.icon) {
-        return defaultCat.icon;
     }
     
     return '◻';
@@ -367,31 +432,6 @@ function getCategoryColor(transaction) {
     }
     
     return transaction.type === 'income' ? '#22C55E' : '#EF4444';
-}
-
-function getCategoryDisplayName(transaction) {
-    if (!transaction) return 'Без категории';
-    
-    if (transaction.categoryName) {
-        return transaction.categoryName;
-    }
-    
-    const categoryId = transaction.category || transaction.categoryId;
-    if (!categoryId) return 'Без категории';
-    
-    const categories = storageInstance.getCategories();
-    const cat = categories.find(c => c.id === categoryId);
-    
-    if (cat && cat.name) {
-        return cat.name;
-    }
-    
-    const defaultCat = DEFAULT_CATEGORIES.find(c => c.id === categoryId);
-    if (defaultCat && defaultCat.name) {
-        return defaultCat.name;
-    }
-    
-    return categoryId || 'Без категории';
 }
 
 function renderChart(transactions) {
@@ -738,6 +778,15 @@ function setupEventListeners() {
         currentPeriod = 'custom';
         renderDashboard();
         showToast(`Период: ${formatDateShort(start)} — ${formatDateShort(end)}`, 'success');
+    });
+
+    // ===== ИСПРАВЛЕНИЕ: Обработчик для кнопки "Все" в последних транзакциях =====
+    document.querySelector('.recent-transactions .header a')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        // Переходим на страницу транзакций
+        if (window.app && window.app.loadTab) {
+            window.app.loadTab('transactions');
+        }
     });
 
     document.addEventListener('transaction-added', () => {

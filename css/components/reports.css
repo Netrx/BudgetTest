@@ -31,6 +31,116 @@
     font-size: var(--font-size-sm);
 }
 
+/* ===== ИСПРАВЛЕНИЕ: Период как на дашборде ===== */
+.reports .period-selector {
+    display: flex;
+    gap: 4px;
+    background: var(--color-bg-secondary);
+    padding: 4px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--color-border);
+    justify-content: center;
+    width: calc(100% - var(--spacing-md) * 6);
+    max-width: 600px;
+    margin: 0 auto var(--spacing-lg) auto;
+    flex-wrap: nowrap;
+    box-sizing: border-box;
+}
+
+.reports .period-btn-pie {
+    padding: 6px 14px;
+    border: none;
+    background: transparent;
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-xs);
+    font-weight: 500;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: var(--transition);
+    font-family: var(--font-family);
+    flex: 1;
+    min-width: 60px;
+    white-space: nowrap;
+}
+
+.reports .period-btn-pie:hover {
+    color: var(--color-text);
+    background: var(--color-bg-hover);
+}
+
+.reports .period-btn-pie.active {
+    background: var(--color-text);
+    color: var(--color-bg);
+}
+
+.reports .period-btn-pie.active:hover {
+    background: var(--color-text-secondary);
+}
+
+/* ===== Поля для выбора дат ===== */
+#pie-custom-dates {
+    display: none;
+    flex-direction: row;
+    align-items: center;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-lg);
+    width: calc(100% - var(--spacing-md) * 6);
+    max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
+    padding: 0;
+    box-sizing: border-box;
+    flex-wrap: nowrap;
+}
+
+#pie-custom-dates > div {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    background: var(--color-bg-secondary);
+    padding: 4px 8px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--color-border);
+    flex-wrap: nowrap;
+    justify-content: center;
+    width: 100%;
+    max-width: 400px;
+    flex: 1;
+}
+
+#pie-custom-dates input[type="date"] {
+    padding: 6px 10px;
+    border: none;
+    background: transparent;
+    color: var(--color-text);
+    font-family: var(--font-family);
+    font-size: var(--font-size-xs);
+    min-width: 130px;
+    outline: none;
+    flex: 1;
+}
+
+#apply-pie-dates {
+    padding: 6px 16px;
+    background: var(--color-text);
+    color: var(--color-bg);
+    border: 1px solid var(--color-text);
+    border-radius: var(--radius-sm);
+    font-family: var(--font-family);
+    font-size: var(--font-size-xs);
+    font-weight: 500;
+    cursor: pointer;
+    transition: var(--transition);
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+#apply-pie-dates:hover {
+    background: var(--color-text-secondary);
+    border-color: var(--color-text-secondary);
+    transform: translateY(-1px);
+}
+
 .reports-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -317,6 +427,15 @@
     .reports-grid {
         padding: 0 calc(var(--spacing-md) * 2);
     }
+    /* ===== ИСПРАВЛЕНИЕ: Выравнивание периода ===== */
+    .reports .period-selector {
+        width: calc(100% - var(--spacing-md) * 4);
+        margin-bottom: var(--spacing-md);
+    }
+    #pie-custom-dates {
+        width: calc(100% - var(--spacing-md) * 4);
+        margin-bottom: var(--spacing-md);
+    }
 }
 
 @media (max-width: 768px) {
@@ -379,6 +498,21 @@
     .category-filter-btn {
         font-size: 10px;
         padding: 3px 8px;
+    }
+    /* ===== ИСПРАВЛЕНИЕ: Выравнивание периода ===== */
+    .reports .period-selector {
+        width: calc(100% - var(--spacing-xs) * 4);
+        margin-bottom: var(--spacing-md);
+        max-width: 100%;
+    }
+    .reports .period-btn-pie {
+        font-size: 10px;
+        padding: 4px 8px;
+    }
+    #pie-custom-dates {
+        width: calc(100% - var(--spacing-xs) * 4);
+        padding: 0;
+        margin-bottom: var(--spacing-md);
     }
 }
 
@@ -443,5 +577,29 @@
     .category-filter-btn {
         font-size: 9px;
         padding: 2px 6px;
+    }
+    /* ===== ИСПРАВЛЕНИЕ: Выравнивание периода ===== */
+    .reports .period-selector {
+        width: calc(100% - var(--spacing-xs) * 2);
+        margin-bottom: var(--spacing-sm);
+        max-width: 100%;
+    }
+    .reports .period-btn-pie {
+        font-size: 9px;
+        padding: 3px 6px;
+        min-width: 50px;
+    }
+    #pie-custom-dates {
+        width: calc(100% - var(--spacing-xs) * 2);
+        padding: 0;
+        margin-bottom: var(--spacing-sm);
+    }
+    #pie-custom-dates input[type="date"] {
+        min-width: 90px;
+        font-size: 9px;
+    }
+    #apply-pie-dates {
+        font-size: 9px;
+        padding: 4px 8px;
     }
 }

@@ -1,11 +1,11 @@
-// ===== МОДУЛЬ: ОТЧЕТЫ =====
+// ===== modules/reports.js =====
 import { formatDateToRussian } from '../utils/dateHelpers.js';
 import { showToast } from '../components/toast.js';
 
 let storageInstance = null;
 let charts = {};
 let pieFilters = {
-    period: 'custom',
+    period: 'month', // ===== ИЗМЕНЕНИЕ: по умолчанию месяц =====
     category: 'all',
     dateStart: null,
     dateEnd: null
@@ -23,12 +23,21 @@ export function init(storage) {
     monthAgo.setMonth(monthAgo.getMonth() - 1);
     const dateStart = document.getElementById('report-pie-date-start');
     const dateEnd = document.getElementById('report-pie-date-end');
-    if (dateStart && !dateStart.value) {
-        dateStart.value = monthAgo.toISOString().split('T')[0];
-    }
-    if (dateEnd && !dateEnd.value) {
-        dateEnd.value = now.toISOString().split('T')[0];
-    }
+    
+    // Устанавливаем даты для кастомного периода
+    if (dateStart) dateStart.value = monthAgo.toISOString().split('T')[0];
+    if (dateEnd) dateEnd.value = now.toISOString().split('T')[0];
+    
+    // ===== ИЗМЕНЕНИЕ: При первой загрузке активируем кнопку "Месяц" =====
+    setTimeout(() => {
+        const monthBtn = document.querySelector('.period-btn-pie[data-period="month"]');
+        if (monthBtn) {
+            monthBtn.classList.add('active');
+            monthBtn.style.background = 'var(--color-text)';
+            monthBtn.style.color = 'var(--color-bg)';
+        }
+    }, 100);
+    
     pieFilters.dateStart = dateStart?.value || null;
     pieFilters.dateEnd = dateEnd?.value || null;
 }
@@ -169,6 +178,7 @@ function renderReports() {
     renderCategoryStats(allTransactions, categories);
     renderMonthlyChart(allTransactions);
     renderExpensePieChart(pieTransactions, categories);
+    renderSubcategoryPieChart(pieTransactions, categories);
 }
 
 function renderCategoryStats(transactions, categories) {
@@ -449,6 +459,7 @@ function renderMonthlyChart(transactions) {
     });
 }
 
+// ===== ФУНКЦИЯ: График расходов по родительским категориям =====
 function renderExpensePieChart(transactions, categories) {
     const canvas = document.getElementById('expense-pie-chart');
     if (!canvas) return;
@@ -456,7 +467,8 @@ function renderExpensePieChart(transactions, categories) {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     
-    const expenseByCategory = {};
+    // Считаем расходы по родительским категориям (учитывая splitData)
+    const expenseByParentCategory = {};
     let hasData = false;
     
     transactions
@@ -464,24 +476,27 @@ function renderExpensePieChart(transactions, categories) {
         .forEach(t => {
             hasData = true;
             const catId = t.category;
-            if (!expenseByCategory[catId]) {
-                const category = categories.find(c => c.id === catId);
-                expenseByCategory[catId] = {
-                    name: category ? category.name : t.categoryName || catId,
-                    color: category ? category.color : '#666666',
+            const category = categories.find(c => c.id === catId);
+            const parentId = category?.parentId || catId;
+            
+            if (!expenseByParentCategory[parentId]) {
+                const parentCategory = categories.find(c => c.id === parentId);
+                expenseByParentCategory[parentId] = {
+                    name: parentCategory?.name || category?.name || t.categoryName || parentId,
+                    icon: parentCategory?.icon || category?.icon || '◻',
+                    color: parentCategory?.color || category?.color || '#666666',
                     total: 0
                 };
             }
-            expenseByCategory[catId].total += t.amount;
+            expenseByParentCategory[parentId].total += t.amount;
         });
     
-    const items = Object.values(expenseByCategory).filter(item => item.total > 0);
+    const items = Object.values(expenseByParentCategory).filter(item => item.total > 0);
     
     // Сортируем по убыванию суммы
     items.sort((a, b) => b.total - a.total);
     
-    // Только названия категорий (без иконок)
-    const labels = items.map(item => item.name);
+    const labels = items.map(item => `${item.icon} ${item.name}`);
     const data = items.map(item => item.total);
     const colors = items.map(item => item.color || '#666666');
     
@@ -528,21 +543,16 @@ function renderExpensePieChart(transactions, categories) {
             cutout: '50%',
             plugins: {
                 legend: {
-                    position: 'bottom',
-                    labels: {
-                        padding: 14,
-                        color: isDark ? '#FFFFFF' : '#000000',
-                        font: { size: 11, weight: '400' },
-                        boxWidth: 0,
-                        usePointStyle: false,
-                        generateLabels: function(chart) {
-                            const data = chart.data;
-                            return data.labels.map((label, i) => ({
-                                text: label,
-                                fillStyle: data.datasets[0].backgroundColor[i],
-                                strokeStyle: data.datasets[0].backgroundColor[i],
-                                index: i
-                            }));
+                    display: false // ===== ОТКЛЮЧАЕМ СТАНДАРТНУЮ ЛЕГЕНДУ =====
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.label || '';
+                            const value = context.parsed || 0;
+                            const total = context.dataset.data.reduce((sum, val) => sum + val, 0);
+                            const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : '0';
+                            return `${label}: ${value.toFixed(2)} ₽ (${percentage}%)`;
                         }
                     }
                 }
@@ -551,27 +561,192 @@ function renderExpensePieChart(transactions, categories) {
                 duration: 600,
                 easing: 'easeOutQuart'
             }
-        },
-        plugins: [{
-            id: 'customLegendColors',
-            afterDraw: function(chart) {
-                const legendItems = chart.legend.legendItems;
-                if (legendItems) {
-                    legendItems.forEach((item, i) => {
-                        const li = chart.legend.legendItems[i];
-                        if (li && li.text) {
-                            const color = colors[i] || '#666666';
-                            const legendItem = document.querySelectorAll('.chartjs-legend li span')[i];
-                            if (legendItem) {
-                                legendItem.style.color = color;
-                                legendItem.style.fontWeight = '500';
-                            }
-                        }
-                    });
+        }
+    });
+    
+    // ===== ГЕНЕРИРУЕМ HTML-ЛЕГЕНДУ С ЦВЕТНЫМИ НАЗВАНИЯМИ =====
+    const legendContainer = document.getElementById('expense-pie-legend');
+    if (legendContainer) {
+        legendContainer.innerHTML = items.map((item, index) => `
+            <span style="
+                display: inline-flex;
+                align-items: center;
+                gap: 4px;
+                margin: 2px 8px 2px 0;
+                font-size: var(--font-size-xs);
+                color: ${item.color};
+                font-weight: 500;
+            ">
+                <span style="
+                    width: 10px;
+                    height: 10px;
+                    border-radius: 50%;
+                    background: ${item.color};
+                    display: inline-block;
+                    flex-shrink: 0;
+                "></span>
+                ${item.icon} ${item.name}
+            </span>
+        `).join('');
+    }
+}
+
+// ===== ФУНКЦИЯ: График расходов по подкатегориям (с учётом splitData) =====
+function renderSubcategoryPieChart(transactions, categories) {
+    const canvas = document.getElementById('subcategory-pie-chart');
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    
+    // Считаем расходы по подкатегориям (учитывая splitData)
+    const expenseBySubcategory = {};
+    let hasData = false;
+    
+    transactions
+        .filter(t => t.type === 'expense')
+        .forEach(t => {
+            hasData = true;
+            const catId = t.category;
+            const category = categories.find(c => c.id === catId);
+            
+            // Если есть распределение по подкатегориям, используем его
+            if (t.splitData && t.splitData.items && t.splitData.items.length > 0) {
+                t.splitData.items.forEach(item => {
+                    const subCategory = categories.find(c => c.id === item.id);
+                    const subParentId = subCategory?.parentId || catId;
+                    
+                    if (!expenseBySubcategory[item.id]) {
+                        expenseBySubcategory[item.id] = {
+                            name: item.name || subCategory?.name || 'Подкатегория',
+                            icon: subCategory?.icon || '◻',
+                            color: subCategory?.color || '#666666',
+                            parentId: subParentId,
+                            parentName: categories.find(c => c.id === subParentId)?.name || '',
+                            total: 0
+                        };
+                    }
+                    expenseBySubcategory[item.id].total += item.amount;
+                });
+            } else {
+                // Если нет распределения, но это подкатегория, используем её напрямую
+                if (category?.parentId) {
+                    const subParentId = category.parentId;
+                    
+                    if (!expenseBySubcategory[catId]) {
+                        expenseBySubcategory[catId] = {
+                            name: category.name,
+                            icon: category.icon || '◻',
+                            color: category.color || '#666666',
+                            parentId: subParentId,
+                            parentName: categories.find(c => c.id === subParentId)?.name || '',
+                            total: 0
+                        };
+                    }
+                    expenseBySubcategory[catId].total += t.amount;
                 }
             }
-        }]
+        });
+    
+    const items = Object.values(expenseBySubcategory).filter(item => item.total > 0);
+    
+    // Сортируем по убыванию суммы
+    items.sort((a, b) => b.total - a.total);
+    
+    const labels = items.map(item => `${item.icon} ${item.name}${item.parentName ? ` (${item.parentName})` : ''}`);
+    const data = items.map(item => item.total);
+    const colors = items.map(item => item.color || '#666666');
+    
+    if (charts.pieSub) {
+        charts.pieSub.destroy();
+        charts.pieSub = null;
+    }
+    
+    if (!hasData || !data.length) {
+        const parent = canvas.parentElement;
+        const existing = parent.querySelector('.empty-state');
+        if (!existing) {
+            const msg = document.createElement('div');
+            msg.className = 'empty-state';
+            msg.innerHTML = '<span class="icon">◻</span>Нет данных о подкатегориях';
+            parent.appendChild(msg);
+        }
+        canvas.style.display = 'none';
+        return;
+    }
+    
+    canvas.style.display = 'block';
+    const parent = canvas.parentElement;
+    const existing = parent.querySelector('.empty-state');
+    if (existing) existing.remove();
+    
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    
+    charts.pieSub = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: labels,
+            datasets: [{
+                data: data,
+                backgroundColor: colors,
+                borderColor: isDark ? '#1A1A1A' : '#FFFFFF',
+                borderWidth: 3,
+                hoverOffset: 8
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '50%',
+            plugins: {
+                legend: {
+                    display: false // ===== ОТКЛЮЧАЕМ СТАНДАРТНУЮ ЛЕГЕНДУ =====
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.label || '';
+                            const value = context.parsed || 0;
+                            const total = context.dataset.data.reduce((sum, val) => sum + val, 0);
+                            const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : '0';
+                            return `${label}: ${value.toFixed(2)} ₽ (${percentage}%)`;
+                        }
+                    }
+                }
+            },
+            animation: {
+                duration: 600,
+                easing: 'easeOutQuart'
+            }
+        }
     });
+    
+    // ===== ГЕНЕРИРУЕМ HTML-ЛЕГЕНДУ С ЦВЕТНЫМИ НАЗВАНИЯМИ =====
+    const legendContainer = document.getElementById('subcategory-pie-legend');
+    if (legendContainer) {
+        legendContainer.innerHTML = items.map((item, index) => `
+            <span style="
+                display: inline-flex;
+                align-items: center;
+                gap: 4px;
+                margin: 2px 8px 2px 0;
+                font-size: var(--font-size-xs);
+                color: ${item.color};
+                font-weight: 500;
+            ">
+                <span style="
+                    width: 10px;
+                    height: 10px;
+                    border-radius: 50%;
+                    background: ${item.color};
+                    display: inline-block;
+                    flex-shrink: 0;
+                "></span>
+                ${item.icon} ${item.name}
+                ${item.parentName ? `<span style="color: var(--color-text-secondary); font-size: 9px;">(${item.parentName})</span>` : ''}
+            </span>
+        `).join('');
+    }
 }
 
 function setupEventListeners() {
@@ -585,8 +760,15 @@ function setupEventListeners() {
     // Обработчики для кнопок периода
     document.querySelectorAll('.period-btn-pie').forEach(btn => {
         btn.addEventListener('click', function() {
-            document.querySelectorAll('.period-btn-pie').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.period-btn-pie').forEach(b => {
+                b.classList.remove('active');
+                b.style.background = 'transparent';
+                b.style.color = 'var(--color-text-secondary)';
+            });
+            
             this.classList.add('active');
+            this.style.background = 'var(--color-text)';
+            this.style.color = 'var(--color-bg)';
             
             const period = this.dataset.period;
             
