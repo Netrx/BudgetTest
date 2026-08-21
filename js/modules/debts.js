@@ -4,6 +4,7 @@ import { showToast } from '../components/toast.js';
 
 let storageInstance = null;
 let currentFilter = 'all';
+let currentCategoryFilter = 'all';
 let repeatCheckInterval = null;
 
 export function init(storage) {
@@ -11,6 +12,7 @@ export function init(storage) {
     renderDebts();
     setupEventListeners();
     startRepeatCheck();
+    populateCategoryFilter();
 }
 
 function startRepeatCheck() {
@@ -107,6 +109,25 @@ function checkRepeatingDebts() {
     }
 }
 
+// ===== ФУНКЦИЯ: Проверка, попадает ли долг в текущий месяц =====
+function isDebtInCurrentMonth(debt) {
+    // Проверяем, есть ли у долга дата оплаты
+    if (!debt.dueDate) return false;
+    
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    
+    // Парсим дату оплаты
+    const dueDate = new Date(debt.dueDate);
+    dueDate.setHours(0, 0, 0, 0);
+    
+    // Проверяем, попадает ли дата оплаты в текущий месяц
+    const dueDateInMonth = dueDate.getMonth() === currentMonth && dueDate.getFullYear() === currentYear;
+    
+    return dueDateInMonth;
+}
+
 function getDebts() {
     const data = storageInstance.getData();
     return data.debts || [];
@@ -118,16 +139,127 @@ function saveDebts(debts) {
     storageInstance.saveData(data);
 }
 
+// ===== ФУНКЦИЯ: Заполнение фильтра по категориям =====
+function populateCategoryFilter() {
+    const container = document.getElementById('debt-category-filter');
+    if (!container) return;
+    
+    const debts = getDebts();
+    const categories = storageInstance.getCategories();
+    
+    // Собираем все категории, которые используются в долгах
+    const usedCategoryIds = new Set();
+    debts.forEach(debt => {
+        if (debt.categoryId) {
+            usedCategoryIds.add(debt.categoryId);
+        }
+        if (debt.subcategoryId) {
+            usedCategoryIds.add(debt.subcategoryId);
+        }
+    });
+    
+    // Получаем родительские категории
+    let parentCategories = categories.filter(c => 
+        c.type === 'expense' && 
+        !c.parentId && 
+        usedCategoryIds.has(c.id)
+    );
+    
+    // Исключаем только "Перетяжку"
+    const excludedCategories = ['перетяжка'];
+    parentCategories = parentCategories.filter(c => !excludedCategories.includes(c.name.toLowerCase()));
+    
+    let html = `
+        <button class="debt-category-filter-btn active" data-category="all" style="
+            padding: 4px 10px;
+            border: 1px solid var(--color-text);
+            background: var(--color-text);
+            color: var(--color-bg);
+            border-radius: var(--radius-sm);
+            font-family: var(--font-family);
+            font-size: var(--font-size-xs);
+            font-weight: 500;
+            cursor: pointer;
+            transition: var(--transition);
+            white-space: nowrap;
+        ">Все</button>
+    `;
+    
+    parentCategories.forEach(cat => {
+        const color = cat.color || '#666666';
+        const count = debts.filter(debt => {
+            // Проверяем, относится ли долг к этой категории или её подкатегории
+            const category = categories.find(c => c.id === debt.categoryId);
+            return category?.parentId === cat.id || debt.categoryId === cat.id;
+        }).length;
+        
+        if (count > 0) {
+            html += `
+                <button class="debt-category-filter-btn" data-category="${cat.id}" data-color="${color}" style="
+                    padding: 4px 10px;
+                    border: 1px solid var(--color-border);
+                    background: transparent;
+                    color: ${color};
+                    border-radius: var(--radius-sm);
+                    font-family: var(--font-family);
+                    font-size: var(--font-size-xs);
+                    font-weight: 500;
+                    cursor: pointer;
+                    transition: var(--transition);
+                    white-space: nowrap;
+                ">${cat.icon || '◻'} ${cat.name}</button>
+            `;
+        }
+    });
+    
+    container.innerHTML = html;
+    
+    // Обработчики для кнопок фильтра
+    document.querySelectorAll('.debt-category-filter-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            document.querySelectorAll('.debt-category-filter-btn').forEach(b => {
+                b.classList.remove('active');
+                b.style.border = '1px solid var(--color-border)';
+                b.style.background = 'transparent';
+                b.style.color = b.dataset.color || 'var(--color-text-secondary)';
+            });
+            
+            this.classList.add('active');
+            this.style.border = '1px solid var(--color-text)';
+            this.style.background = 'var(--color-text)';
+            this.style.color = 'var(--color-bg)';
+            
+            currentCategoryFilter = this.dataset.category;
+            renderDebts();
+        });
+    });
+}
+
+// ===== ФУНКЦИЯ: renderDebts =====
 function renderDebts() {
     const debts = getDebts();
     const categories = storageInstance.getCategories();
     const expenseCategories = categories.filter(c => c.type === 'expense');
-
+    
+    // Фильтр по типу (все/активные/погашенные/текущий месяц)
     let filtered = debts;
     if (currentFilter === 'active') {
         filtered = debts.filter(d => d.paidAmount < d.amount);
     } else if (currentFilter === 'paid') {
         filtered = debts.filter(d => d.paidAmount >= d.amount);
+    } else if (currentFilter === 'month') {
+        // Фильтр для текущего месяца — только долги с датой оплаты в этом месяце
+        filtered = debts.filter(debt => isDebtInCurrentMonth(debt));
+    }
+
+    // Фильтр по категории
+    if (currentCategoryFilter !== 'all') {
+        filtered = filtered.filter(debt => {
+            const category = categories.find(c => c.id === debt.categoryId);
+            const isParentCategory = !category?.parentId && debt.categoryId === currentCategoryFilter;
+            const isSubCategory = category?.parentId === currentCategoryFilter;
+            return isParentCategory || isSubCategory;
+        });
     }
 
     filtered.sort((a, b) => {
@@ -141,8 +273,27 @@ function renderDebts() {
     const container = document.getElementById('debts-grid');
     if (!container) return;
 
-    const totalDebts = debts.reduce((sum, d) => sum + d.amount, 0);
-    const totalPaid = debts.reduce((sum, d) => sum + (d.paidAmount || 0), 0);
+    // Обновляем статистику с учётом фильтра по типу и категории
+    let statsDebts = debts;
+    if (currentFilter === 'active') {
+        statsDebts = debts.filter(d => d.paidAmount < d.amount);
+    } else if (currentFilter === 'paid') {
+        statsDebts = debts.filter(d => d.paidAmount >= d.amount);
+    } else if (currentFilter === 'month') {
+        statsDebts = debts.filter(debt => isDebtInCurrentMonth(debt));
+    }
+    
+    if (currentCategoryFilter !== 'all') {
+        statsDebts = statsDebts.filter(debt => {
+            const category = categories.find(c => c.id === debt.categoryId);
+            const isParentCategory = !category?.parentId && debt.categoryId === currentCategoryFilter;
+            const isSubCategory = category?.parentId === currentCategoryFilter;
+            return isParentCategory || isSubCategory;
+        });
+    }
+
+    const totalDebts = statsDebts.reduce((sum, d) => sum + d.amount, 0);
+    const totalPaid = statsDebts.reduce((sum, d) => sum + (d.paidAmount || 0), 0);
     const remaining = totalDebts - totalPaid;
 
     document.getElementById('total-debts').textContent = totalDebts.toFixed(2) + ' ₽';
@@ -180,7 +331,7 @@ function renderDebts() {
         const categoryName = subcategory?.name || category?.name || 'Без категории';
         const repeatLabel = getRepeatLabel(debt.repeatType, debt.repeatInterval);
         const hasTransactions = debt.transactionIds && debt.transactionIds.length > 0;
-        const showOnDashboard = debt.showOnDashboard !== false; // undefined => true
+        const showOnDashboard = debt.showOnDashboard !== false;
 
         return `
             <div class="debt-card" data-debt-id="${debt.id}">
@@ -432,6 +583,7 @@ function openAddDebtModal() {
         debts.push(debt);
         saveDebts(debts);
         renderDebts();
+        populateCategoryFilter();
         showToast('Долг добавлен', 'success');
     });
 
@@ -601,6 +753,7 @@ function openEditDebtModal(id) {
             debts[index] = { ...debts[index], ...updated };
             saveDebts(debts);
             renderDebts();
+            populateCategoryFilter();
             document.dispatchEvent(new Event('debt-updated'));
             showToast('Долг обновлен', 'success');
         }
@@ -643,7 +796,6 @@ function openEditDebtModal(id) {
     }, 100);
 }
 
-// ===== ИСПРАВЛЕНИЕ: Функция openPayDebtModal =====
 function openPayDebtModal(id, mode = 'full') {
     const debts = getDebts();
     const debt = debts.find(d => d.id === id);
@@ -716,7 +868,6 @@ function openPayDebtModal(id, mode = 'full') {
         const category = storageInstance.getCategory(debt.categoryId);
         const subcategory = debt.subcategoryId ? storageInstance.getCategory(debt.subcategoryId) : null;
         
-        // ===== ИСПРАВЛЕНИЕ: Правильное создание транзакции =====
         const transaction = {
             type: 'expense',
             amount: payAmount,
@@ -729,7 +880,6 @@ function openPayDebtModal(id, mode = 'full') {
             isDebtPayment: true
         };
         
-        // Добавляем транзакцию
         const savedTransaction = storageInstance.addTransaction(transaction);
         
         if (savedTransaction && savedTransaction.id) {
@@ -741,15 +891,8 @@ function openPayDebtModal(id, mode = 'full') {
         }
         
         showToast(`Погашено ${payAmount.toFixed(2)} ₽`, 'success');
-        
-        // ===== ИСПРАВЛЕНИЕ: Обновляем всё =====
         document.dispatchEvent(new Event('transaction-added'));
         document.dispatchEvent(new Event('debt-updated'));
-        
-        // Обновляем шапку с балансом
-        if (window.app && window.app.refreshHeader) {
-            window.app.refreshHeader();
-        }
         
         if (debts[index].paidAmount >= debts[index].amount) {
             showToast(`Долг "${debt.title}" полностью погашен! 🎉`, 'success');
@@ -791,11 +934,6 @@ function restoreDebt(id) {
     document.dispatchEvent(new Event('debt-updated'));
     showToast(`Долг "${debt.title}" возвращен в активные`, 'success');
     document.dispatchEvent(new Event('transaction-deleted'));
-    
-    // Обновляем шапку с балансом
-    if (window.app && window.app.refreshHeader) {
-        window.app.refreshHeader();
-    }
 }
 
 function resetDebt(id) {
@@ -830,11 +968,6 @@ function resetDebt(id) {
     document.dispatchEvent(new Event('debt-updated'));
     showToast(`Долг "${debt.title}" обнулен`, 'success');
     document.dispatchEvent(new Event('transaction-deleted'));
-    
-    // Обновляем шапку с балансом
-    if (window.app && window.app.refreshHeader) {
-        window.app.refreshHeader();
-    }
 }
 
 function deleteDebt(id) {
@@ -860,13 +993,9 @@ function deleteDebt(id) {
         const newDebts = debts.filter(d => d.id !== id);
         saveDebts(newDebts);
         renderDebts();
+        populateCategoryFilter();
         document.dispatchEvent(new Event('debt-updated'));
         showToast('Долг удален', 'success');
         document.dispatchEvent(new Event('transaction-deleted'));
-        
-        // Обновляем шапку с балансом
-        if (window.app && window.app.refreshHeader) {
-            window.app.refreshHeader();
-        }
     }
 }
