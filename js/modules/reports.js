@@ -130,7 +130,7 @@ function populateCategoryFilters() {
         if (hasTransactions) {
             const color = cat.color || '#666666';
             html += `
-                <button class="category-filter-btn main-cat" data-category="${cat.id}" data-color="${color}" style="padding: 4px 10px; border: 1px solid var(--color-border); background: transparent; color: ${color}; border-radius: var(--radius-sm); font-family: var(--font-family); font-size: var(--font-size-xs); font-weight: 500; cursor: pointer; transition: var(--transition); white-space: nowrap;">${cat.icon} ${cat.name}</button>
+                <button class="category-filter-btn main-cat" data-category="${cat.id}" data-color="${color}" style="padding: 4px 10px; border: 1px solid var(--color-border); background: transparent; color: ${color}; border-radius: var(--radius-sm); font-family: var(--font-family); font-size: var(--font-size-xs); font-weight: 500; cursor: pointer; transition: var(--transition); white-space: nowrap;">${cat.name}</button>
             `;
         }
     });
@@ -174,7 +174,6 @@ function renderReports() {
     renderMonthlyChart(allTransactions);
     renderExpensePieChart(pieTransactions, categories);
     renderSubcategoryPieChart(pieTransactions, categories);
-    
     renderIncomePieChart(pieTransactions, categories);
 }
 
@@ -195,7 +194,6 @@ function renderCategoryStats(transactions, categories) {
                 stats[catId] = {
                     id: catId,
                     name: category ? category.name : t.categoryName || catId,
-                    icon: category ? category.icon : '◻',
                     color: category ? category.color : '#666666',
                     parentId: category ? category.parentId : null,
                     total: 0
@@ -212,7 +210,6 @@ function renderCategoryStats(transactions, categories) {
             grouped[key] = {
                 id: key,
                 name: parentCategory ? parentCategory.name : stat.name,
-                icon: parentCategory ? parentCategory.icon : stat.icon,
                 color: parentCategory ? parentCategory.color : stat.color,
                 total: 0,
                 children: []
@@ -277,7 +274,7 @@ function renderCategoryStats(transactions, categories) {
         return `
             <div class="category-stat-wrapper" style="margin-bottom: 4px;">
                 <div class="category-stat main-stat ${hasToggle ? 'clickable' : ''}" style="animation: fadeIn 0.3s ease ${index * 0.05}s both; padding: 6px 8px; border-radius: var(--radius-sm); cursor: ${hasToggle ? 'pointer' : 'default'}; display: flex; align-items: center; gap: var(--spacing-sm);">
-                    <span class="name" style="color: ${color}; ${hasToggle ? 'font-weight: 600;' : ''} flex: 1; min-width: 120px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${group.icon} ${group.name}</span>
+                    <span class="name" style="color: ${color}; ${hasToggle ? 'font-weight: 600;' : ''} flex: 1; min-width: 120px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${group.name}</span>
                     <div class="bar-track" style="flex: 1; height: 6px; background: var(--color-bg-secondary); border-radius: var(--radius-sm); overflow: hidden;">
                         <div class="bar-fill" style="width: ${Math.min(percentage, 100)}%; background: ${color}; height: 100%; border-radius: var(--radius-sm); transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);"></div>
                     </div>
@@ -383,7 +380,7 @@ function renderMonthlyChart(transactions) {
                     data: incomeData,
                     borderColor: '#10B981',
                     backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                    fill: false, // ===== ИСПРАВЛЕНО: убрана заливка =====
+                    fill: false,
                     tension: 0.4,
                     borderWidth: 2,
                     pointRadius: 4,
@@ -396,7 +393,7 @@ function renderMonthlyChart(transactions) {
                     data: expenseData,
                     borderColor: '#EF4444',
                     backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                    fill: false, // ===== ИСПРАВЛЕНО: убрана заливка =====
+                    fill: false,
                     tension: 0.4,
                     borderWidth: 2,
                     pointRadius: 4,
@@ -480,7 +477,6 @@ function renderExpensePieChart(transactions, categories) {
                 const parentCategory = categories.find(c => c.id === parentId);
                 expenseByParentCategory[parentId] = {
                     name: parentCategory?.name || category?.name || t.categoryName || parentId,
-                    icon: parentCategory?.icon || category?.icon || '◻',
                     color: parentCategory?.color || category?.color || '#666666',
                     total: 0
                 };
@@ -492,7 +488,7 @@ function renderExpensePieChart(transactions, categories) {
     
     items.sort((a, b) => b.total - a.total);
     
-    const labels = items.map(item => `${item.icon} ${item.name}`);
+    const labels = items.map(item => item.name);
     const data = items.map(item => item.total);
     const colors = items.map(item => item.color || '#666666');
     
@@ -580,7 +576,7 @@ function renderExpensePieChart(transactions, categories) {
                     display: inline-block;
                     flex-shrink: 0;
                 "></span>
-                ${item.icon} ${item.name}
+                ${item.name}
             </span>
         `).join('');
     }
@@ -612,7 +608,6 @@ function renderSubcategoryPieChart(transactions, categories) {
                     if (!expenseBySubcategory[item.id]) {
                         expenseBySubcategory[item.id] = {
                             name: item.name || subCategory?.name || 'Подкатегория',
-                            icon: subCategory?.icon || '◻',
                             color: subCategory?.color || '#666666',
                             parentId: subParentId,
                             parentName: categories.find(c => c.id === subParentId)?.name || '',
@@ -628,7 +623,6 @@ function renderSubcategoryPieChart(transactions, categories) {
                     if (!expenseBySubcategory[catId]) {
                         expenseBySubcategory[catId] = {
                             name: category.name,
-                            icon: category.icon || '◻',
                             color: category.color || '#666666',
                             parentId: subParentId,
                             parentName: categories.find(c => c.id === subParentId)?.name || '',
@@ -644,7 +638,7 @@ function renderSubcategoryPieChart(transactions, categories) {
     
     items.sort((a, b) => b.total - a.total);
     
-    const labels = items.map(item => `${item.icon} ${item.name}${item.parentName ? ` (${item.parentName})` : ''}`);
+    const labels = items.map(item => `${item.name}${item.parentName ? ` (${item.parentName})` : ''}`);
     const data = items.map(item => item.total);
     const colors = items.map(item => item.color || '#666666');
     
@@ -732,7 +726,7 @@ function renderSubcategoryPieChart(transactions, categories) {
                     display: inline-block;
                     flex-shrink: 0;
                 "></span>
-                ${item.icon} ${item.name}
+                ${item.name}
                 ${item.parentName ? `<span style="color: var(--color-text-secondary); font-size: 9px;">(${item.parentName})</span>` : ''}
             </span>
         `).join('');
@@ -762,7 +756,6 @@ function renderIncomePieChart(transactions, categories) {
             const parentCategory = categories.find(c => c.id === parentId);
             incomeByParentCategory[parentId] = {
                 name: parentCategory?.name || category?.name || t.categoryName || parentId,
-                icon: parentCategory?.icon || category?.icon || '◻',
                 color: parentCategory?.color || category?.color || '#22C55E',
                 total: 0
             };
@@ -774,7 +767,7 @@ function renderIncomePieChart(transactions, categories) {
     
     items.sort((a, b) => b.total - a.total);
     
-    const labels = items.map(item => `${item.icon} ${item.name}`);
+    const labels = items.map(item => item.name);
     const data = items.map(item => item.total);
     const colors = items.map(item => item.color || '#22C55E');
     
@@ -862,7 +855,7 @@ function renderIncomePieChart(transactions, categories) {
                     display: inline-block;
                     flex-shrink: 0;
                 "></span>
-                ${item.icon} ${item.name}
+                ${item.name}
             </span>
         `).join('');
     }

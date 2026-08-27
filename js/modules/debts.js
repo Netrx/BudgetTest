@@ -48,25 +48,19 @@ function archiveCompletedDebts() {
         const isPaid = (debt.paidAmount || 0) >= debt.amount;
         
         if (isPaid && !debt.isArchived) {
-            // Если долг повторяющийся, проверяем, прошла ли последняя дата
             if (debt.repeatEnabled && debt.repeatType !== 'none') {
                 const endDateStr = debt.lastRepeatDateEnd;
                 if (endDateStr) {
                     const endDate = new Date(endDateStr);
                     endDate.setHours(0, 0, 0, 0);
                     
-                    // Если сегодня после последней даты - архивируем
                     if (today > endDate) {
                         debt.isArchived = true;
                         debt.archivedAt = new Date().toISOString();
                         updated = true;
                     }
-                } else {
-                    // Если нет даты окончания, но долг оплачен - оставляем активным
-                    // (так как повторяющийся долг должен продолжать создаваться)
                 }
             } else {
-                // Обычный долг - сразу архивируем после полной оплаты
                 debt.isArchived = true;
                 debt.archivedAt = new Date().toISOString();
                 updated = true;
@@ -81,14 +75,13 @@ function archiveCompletedDebts() {
     }
 }
 
-// ===== МИГРАЦИЯ: Ставим дату оплаты на сегодня, если она отсутствует =====
+// ===== МИГРАЦИЯ =====
 function migrateExistingDebts() {
     const debts = getDebts();
     let needsSave = false;
     
     debts.forEach(debt => {
         if (debt.isArchived === undefined) {
-            // Если долг оплачен и не повторяющийся - помечаем как архивный
             if ((debt.paidAmount || 0) >= debt.amount && (!debt.repeatEnabled || debt.repeatType === 'none')) {
                 debt.isArchived = true;
                 debt.archivedAt = debt.archivedAt || new Date().toISOString();
@@ -118,11 +111,10 @@ function updateDebtStatuses() {
     let updated = false;
     
     debts.forEach(debt => {
-        if (debt.isArchived) return; // Пропускаем архивные
+        if (debt.isArchived) return;
         
         const isPaid = (debt.paidAmount || 0) >= debt.amount;
         
-        // Если долг повторяющийся и оплачен – проверяем, прошла ли дата оплаты
         if (debt.repeatEnabled && debt.repeatType !== 'none' && isPaid) {
             const paymentDateStr = debt.dueDate;
             
@@ -131,11 +123,9 @@ function updateDebtStatuses() {
                 paymentDate.setHours(0, 0, 0, 0);
                 
                 if (today > paymentDate) {
-                    // Сбрасываем оплату
                     debt.paidAmount = 0;
                     debt.transactionIds = [];
                     
-                    // Сдвигаем дату оплаты на следующий период
                     const nextDueDate = new Date(paymentDate);
                     
                     switch (debt.repeatType) {
@@ -164,7 +154,6 @@ function updateDebtStatuses() {
             }
         }
         
-        // Если долг не оплачен и срок прошёл – помечаем его как просроченный (красный)
         if (!isPaid && debt.dueDate) {
             const dueDate = new Date(debt.dueDate);
             dueDate.setHours(0, 0, 0, 0);
@@ -208,7 +197,7 @@ function checkRepeatingDebts() {
     let updated = false;
     
     debts.forEach(debt => {
-        if (debt.isArchived) return; // Пропускаем архивные
+        if (debt.isArchived) return;
         
         if (!debt.repeatEnabled || debt.repeatType === 'none') return;
         if (!debt.lastRepeatDate) return;
@@ -377,7 +366,7 @@ function populateCategoryFilter() {
                     cursor: pointer;
                     transition: var(--transition);
                     white-space: nowrap;
-                ">${cat.icon || '◻'} ${cat.name}</button>
+                ">${cat.name}</button>
             `;
         }
     });
@@ -411,11 +400,9 @@ function renderDebts() {
     
     let filtered = debts;
     
-    // ===== ИСПРАВЛЕНИЕ: Фильтрация с учётом архива =====
     if (currentFilter === 'archive') {
         filtered = debts.filter(d => d.isArchived === true);
     } else {
-        // Сначала отсеиваем архивные, потом применяем фильтры
         filtered = debts.filter(d => d.isArchived !== true);
         
         if (currentFilter === 'active') {
@@ -436,7 +423,6 @@ function renderDebts() {
         });
     }
 
-    // Сортировка: просроченные в начале, затем активные, затем оплаченные
     if (currentFilter !== 'archive') {
         filtered.sort((a, b) => {
             const aOverdue = (a.isOverdue === true && (a.paidAmount || 0) < a.amount && a.repeatEnabled && a.repeatType !== 'none');
@@ -452,7 +438,6 @@ function renderDebts() {
             return 0;
         });
     } else {
-        // В архиве сортируем по дате архивации (новые сверху)
         filtered.sort((a, b) => {
             const dateA = new Date(a.archivedAt || 0);
             const dateB = new Date(b.archivedAt || 0);
@@ -463,7 +448,6 @@ function renderDebts() {
     const container = document.getElementById('debts-grid');
     if (!container) return;
 
-    // Статистика (исключаем архивные)
     let statsDebts = debts.filter(d => d.isArchived !== true);
     if (currentFilter === 'active') {
         statsDebts = statsDebts.filter(d => d.paidAmount < d.amount);
@@ -515,7 +499,6 @@ function renderDebts() {
         const category = expenseCategories.find(c => c.id === debt.categoryId);
         const subcategory = debt.subcategoryId ? expenseCategories.find(c => c.id === debt.subcategoryId) : null;
         const color = subcategory?.color || category?.color || '#666666';
-        const icon = subcategory?.icon || category?.icon || '◆';
         const isPaid = debt.paidAmount >= debt.amount;
         const paidPercent = Math.min((debt.paidAmount / debt.amount) * 100, 100);
         
@@ -538,7 +521,7 @@ function renderDebts() {
         return `
             <div class="debt-card" data-debt-id="${debt.id}" style="${isOverdue ? 'border-color: #EF4444; box-shadow: 0 0 10px rgba(239, 68, 68, 0.1);' : ''}${isArchived ? 'opacity: 0.7; background: var(--color-bg-secondary);' : ''}">
                 <div class="debt-header">
-                    <span class="debt-title" style="color: ${isOverdue ? '#EF4444' : color};">${icon} ${debt.title}</span>
+                    <span class="debt-title" style="color: ${isOverdue ? '#EF4444' : color};">${debt.title}</span>
                     <span class="debt-status ${status}">${statusLabels[status]}</span>
                 </div>
                 <div class="debt-category">${categoryName} ${repeatLabel ? '🔄 ' + repeatLabel : ''}</div>
@@ -661,7 +644,6 @@ function toggleDebtVisibility(id) {
     showToast(`Долг "${debt.title}" ${debt.showOnDashboard ? 'показан' : 'скрыт'} на главной`, 'success');
 }
 
-// ===== НОВАЯ ФУНКЦИЯ: Отправить в архив =====
 function archiveDebt(id) {
     const debts = getDebts();
     const debt = debts.find(d => d.id === id);
@@ -723,7 +705,7 @@ function openAddDebtModal() {
     const expenseCategories = categories.filter(c => c.type === 'expense' && !c.parentId);
 
     const categoryOptions = expenseCategories.map(c => 
-        `<option value="${c.id}">${c.icon || '◆'} ${c.name}</option>`
+        `<option value="${c.id}">${c.name}</option>`
     ).join('');
 
     const today = new Date().toISOString().split('T')[0];
@@ -858,7 +840,7 @@ function openAddDebtModal() {
                 
                 subcategorySelect.innerHTML = '<option value="">Без подкатегории</option>';
                 subcategories.forEach(sub => {
-                    subcategorySelect.innerHTML += `<option value="${sub.id}">${sub.icon || '◆'} ${sub.name}</option>`;
+                    subcategorySelect.innerHTML += `<option value="${sub.id}">${sub.name}</option>`;
                 });
             });
         }
@@ -874,12 +856,12 @@ function openEditDebtModal(id) {
     const expenseCategories = categories.filter(c => c.type === 'expense' && !c.parentId);
 
     const categoryOptions = expenseCategories.map(c => 
-        `<option value="${c.id}" ${c.id === debt.categoryId ? 'selected' : ''}>${c.icon || '◆'} ${c.name}</option>`
+        `<option value="${c.id}" ${c.id === debt.categoryId ? 'selected' : ''}>${c.name}</option>`
     ).join('');
 
     const subcategories = categories.filter(c => c.type === 'expense' && c.parentId === debt.categoryId);
     const subcategoryOptions = subcategories.map(sub => 
-        `<option value="${sub.id}" ${sub.id === debt.subcategoryId ? 'selected' : ''}>${sub.icon || '◆'} ${sub.name}</option>`
+        `<option value="${sub.id}" ${sub.id === debt.subcategoryId ? 'selected' : ''}>${sub.name}</option>`
     ).join('');
 
     const showEndDate = debt.repeatType && debt.repeatType !== 'none' ? 'block' : 'none';
@@ -1026,7 +1008,7 @@ function openEditDebtModal(id) {
                 subcategorySelect.innerHTML = '<option value="">Без подкатегории</option>';
                 subcategories.forEach(sub => {
                     const selected = sub.id === currentSub ? 'selected' : '';
-                    subcategorySelect.innerHTML += `<option value="${sub.id}" ${selected}>${sub.icon || '◆'} ${sub.name}</option>`;
+                    subcategorySelect.innerHTML += `<option value="${sub.id}" ${selected}>${sub.name}</option>`;
                 });
             });
         }
@@ -1140,7 +1122,6 @@ function openPayDebtModal(id, mode = 'full') {
         document.dispatchEvent(new Event('debt-updated'));
         
         if (debts[index].paidAmount >= debts[index].amount) {
-            // ===== ИЗМЕНЕНИЕ: Проверяем, надо ли архивировать =====
             const updatedDebt = debts[index];
             const shouldArchive = !updatedDebt.repeatEnabled || updatedDebt.repeatType === 'none' || 
                 (updatedDebt.lastRepeatDateEnd && new Date(updatedDebt.lastRepeatDateEnd) <= new Date());
@@ -1175,7 +1156,6 @@ function restoreDebt(id) {
         return;
     }
 
-    // Если возвращаем из архива, удаляем связанные транзакции
     if (isFromArchive && debt.transactionIds && debt.transactionIds.length > 0) {
         let deletedCount = 0;
         debt.transactionIds.forEach(transactionId => {
