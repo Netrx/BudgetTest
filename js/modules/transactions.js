@@ -894,6 +894,21 @@ function openEditModal(id) {
             if (splitTotalEl) {
                 splitTotalEl.textContent = transaction.splitData.total.toFixed(2);
             }
+        } else if (transaction.subcategoryId && transaction.category) {
+            // ===== ИСПРАВЛЕНИЕ: Если транзакция с подкатегорией, но без splitData =====
+            const splitContainer = document.getElementById('split-container');
+            if (!splitContainer) return;
+            
+            const amountInput = splitContainer.querySelector(`input[data-subcat-id="${transaction.subcategoryId}"]`);
+            if (amountInput) {
+                amountInput.value = transaction.amount;
+            }
+            
+            // Обновляем общую сумму
+            const splitTotalEl = document.getElementById('split-total');
+            if (splitTotalEl) {
+                splitTotalEl.textContent = Number(transaction.amount).toFixed(2);
+            }
         }
     }, 100);
 }
