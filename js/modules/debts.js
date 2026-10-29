@@ -73,7 +73,6 @@ function migrateExistingDebts() {
         debt.isOverdue = Boolean(debt.isOverdue);
         debt.showOnDashboard = debt.showOnDashboard !== false;
         if (debt.periods.length) recalcDebtFromPeriods(debt);
-        // Persist normalization/manual schedule metadata immediately.
         needsSave = true;
     });
 
@@ -113,8 +112,6 @@ function getScheduleStart(debt) {
     return isNaN(start.getTime()) ? null : start;
 }
 
-// For an endless recurring debt we keep only the relevant current occurrence
-// and one nearest future occurrence. We do not materialize a year of future debt.
 function getIndefiniteWindowDates(debt) {
     const start = getScheduleStart(debt);
     if (!start) return [];
@@ -182,7 +179,6 @@ function recalcDebtFromPeriods(debt) {
     debt.paidAmount = debt.periods.reduce((sum, p) => sum + Number(p.paidAmount || 0), 0);
 }
 
-// Non-destructive background sync. Existing periods are never overwritten here.
 function archivePaidPeriodsForIndefiniteDebt(debt) {
     if (!isIndefiniteAutomaticDebt(debt) || !Array.isArray(debt.periods) || !debt.periods.length) return false;
     debt.archivedPeriods = Array.isArray(debt.archivedPeriods) ? debt.archivedPeriods : [];
@@ -237,7 +233,6 @@ function updateManualScheduleSnapshot(debt) {
     }));
 }
 
-// Non-destructive background sync. Manual periods are never touched.
 function syncAllAutomaticPeriods() {
     const debts = getDebts();
     let changed = false;
@@ -266,7 +261,6 @@ function syncAllAutomaticPeriods() {
             }
         });
 
-        // Endless schedules keep unpaid/overdue periods plus only one future period.
         if (isIndefiniteAutomaticDebt(debt)) {
             const todayStr = toDateString(new Date());
             const future = debt.periods
@@ -283,7 +277,6 @@ function syncAllAutomaticPeriods() {
     if (changed) saveDebts(debts);
 }
 
-// Explicit debt edit: update schedule fields while preserving payment/history by period order.
 function rebuildPeriodsForEditedDebt(debt, oldPeriods = []) {
     if (!debt.repeatEnabled || debt.repeatType === 'none') {
         debt.periods = [];
@@ -292,7 +285,6 @@ function rebuildPeriodsForEditedDebt(debt, oldPeriods = []) {
         return;
     }
     if (debt.repeatType === 'manual') {
-        // Manual schedule is authoritative: never regenerate or truncate it in background/edit flows.
         debt.periods = oldPeriods.map(p => ({ ...p }));
         debt.periods.forEach(p => {
             if (!Number.isFinite(Number(p.amount)) || Number(p.amount) <= 0) p.amount = Number(debt.baseAmount || 0);
@@ -316,7 +308,6 @@ function rebuildPeriodsForEditedDebt(debt, oldPeriods = []) {
     recalcDebtFromPeriods(debt);
 }
 
-// Backward-compatible wrapper used by init/add.
 function generateAllPeriods() { syncAllAutomaticPeriods(); }
 
 // ===== АРХИВАЦИЯ =====
@@ -595,36 +586,37 @@ function renderDebts() {
         const periods = debt.periods || [];
         
         let displayAmount = debt.amount;
-        let nextPeriod = null;
         let periodToDisplay = null;
         
         if (isRepeat) {
             const sortedPeriods = [...periods].sort((a, b) => new Date(a.dueDate + 'T00:00:00') - new Date(b.dueDate + 'T00:00:00'));
             
-            // Ищем текущий (ближайший неоплаченный) период для отображения
+            // Ищем текущий (ближайший неоплаченный) период
             const unpaidPeriods = sortedPeriods.filter(p => Number(p.paidAmount || 0) < Number(p.amount || 0));
             
-            periodToDisplay = unpaidPeriods[0] || null;
-            nextPeriod = unpaidPeriods[0] || null;
+            // Если есть неоплаченные, берем первый. Если нет — берем самый первый период из списка (чтобы отобразить сумму текущего цикла)
+            periodToDisplay = unpaidPeriods[0] || sortedPeriods[0] || null;
             
-            // ВСЕГДА показываем сумму текущего периода (или базовую, если периодов нет)
             if (periodToDisplay) {
-                displayAmount = periodToDisplay.amount; // Берем сумму именно текущего периода
+                displayAmount = Number(periodToDisplay.amount || 0);
             } else {
-                displayAmount = debt.baseAmount || 0;
+                displayAmount = Number(debt.baseAmount || 0);
             }
         }
         
-        // Прогресс считаем по всему долгу, а не по отдельному периоду,
-        // чтобы полоса не "обнулялась" после оплаты очередного периода.
-        const totalDebtAmount = Number(debt.amount || 0);
-        const totalDebtPaid = Number(debt.paidAmount || 0);
-        const totalRemaining = Math.max(totalDebtAmount - totalDebtPaid, 0);
-        const paidPercent = totalDebtAmount > 0
-            ? Math.min((totalDebtPaid / totalDebtAmount) * 100, 100)
-            : 0;
+        // Прогресс считаем ТОЛЬКО для текущего периода
+        let paidPercent = 0;
+        if (isRepeat && periodToDisplay) {
+            const periodAmount = Number(periodToDisplay.amount || 0);
+            const periodPaid = Number(periodToDisplay.paidAmount || 0);
+            paidPercent = periodAmount > 0 ? Math.min((periodPaid / periodAmount) * 100, 100) : 0;
+        } else {
+            const totalDebtAmount = Number(debt.amount || 0);
+            const totalDebtPaid = Number(debt.paidAmount || 0);
+            paidPercent = totalDebtAmount > 0 ? Math.min((totalDebtPaid / totalDebtAmount) * 100, 100) : 0;
+        }
         
-        const isOverdue = (periodToDisplay && new Date(periodToDisplay.dueDate + 'T00:00:00') <= new Date()) ? true : false;
+        const isOverdue = (periodToDisplay && periodToDisplay.dueDate && new Date(periodToDisplay.dueDate + 'T00:00:00') <= new Date()) ? true : false;
         const status = isArchived ? 'archived' : (isPaid ? 'paid' : (isOverdue ? 'overdue' : (debt.paidAmount > 0 ? 'partial' : 'active')));
         const statusLabels = { paid: 'Погашен', partial: 'Частично', active: 'Активен', overdue: 'Просрочен', archived: 'В архиве' };
         
@@ -693,7 +685,7 @@ function renderDebts() {
                         <button class="btn-toggle-visibility" data-id="${debt.id}" style="${showOnDashboard ? '' : 'opacity:0.6;'}">${showOnDashboard ? 'Скрыть' : 'Показать'}</button>
                         ${!isPaid ? `
                             <button class="btn-pay-full" data-id="${debt.id}">💰 Погасить</button>
-                            ${isRepeat && nextPeriod ? `<button class="btn-pay-current-period" data-id="${debt.id}">📅 Оплатить месяц</button>` : ''}
+                            ${isRepeat && periodToDisplay ? `<button class="btn-pay-current-period" data-id="${debt.id}">📅 Оплатить месяц</button>` : ''}
                             <button class="btn-pay-partial" data-id="${debt.id}">📊 Частично</button>
                         ` : `
                             <button class="btn-restore-debt" data-id="${debt.id}">↩ Вернуть</button>
@@ -727,7 +719,7 @@ function renderDebts() {
         `;
     }).join('');
 
-    // Делегирование событий для всех кнопок внутри контейнера
+    // Делегирование событий
     container.onclick = (e) => {
         const target = e.target.closest('button');
         if (!target) return;
