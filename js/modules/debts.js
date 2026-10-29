@@ -604,47 +604,30 @@ function renderDebts() {
             const today = new Date();
             today.setHours(0, 0, 0, 0);
             
-            const currentOrOverdue = sortedPeriods.find(p => {
-                const dueDate = new Date(p.dueDate + 'T00:00:00');
-                return dueDate <= today;
-            });
+            // Ближайший неоплаченный период — именно его показываем в карточке.
+            // Уже оплаченные периоды (в т.ч. просроченные, но оплаченные) пропускаем.
+            const unpaidPeriods = sortedPeriods.filter(p => Number(p.paidAmount || 0) < Number(p.amount || 0));
             
-            let nextAfterCurrent = null;
-            if (currentOrOverdue) {
-                const currentIndex = sortedPeriods.indexOf(currentOrOverdue);
-                nextAfterCurrent = sortedPeriods[currentIndex + 1] || null;
-            } else {
-                nextAfterCurrent = sortedPeriods[0] || null;
-            }
-            
-            if (currentOrOverdue) {
-                if ((currentOrOverdue.paidAmount || 0) < currentOrOverdue.amount) {
-                    periodToDisplay = currentOrOverdue;
-                } else {
-                    periodToDisplay = nextAfterCurrent || currentOrOverdue;
-                }
-            } else {
-                periodToDisplay = nextAfterCurrent;
-            }
+            periodToDisplay = unpaidPeriods[0] || null;
+            nextPeriod = unpaidPeriods[0] || null;
             
             if (periodToDisplay) {
                 displayAmount = periodToDisplay.amount;
             } else {
                 displayAmount = debt.baseAmount || 0;
             }
-            
-            nextPeriod = sortedPeriods.find(p => (p.paidAmount || 0) < p.amount);
         }
         
         // Прогресс считаем по всему долгу, а не по отдельному периоду,
         // чтобы полоса не "обнулялась" после оплаты очередного периода.
         const totalDebtAmount = Number(debt.amount || 0);
         const totalDebtPaid = Number(debt.paidAmount || 0);
+        const totalRemaining = Math.max(totalDebtAmount - totalDebtPaid, 0);
         const paidPercent = totalDebtAmount > 0
             ? Math.min((totalDebtPaid / totalDebtAmount) * 100, 100)
             : 0;
         
-        const isOverdue = (periodToDisplay && (periodToDisplay.paidAmount || 0) < periodToDisplay.amount && new Date(periodToDisplay.dueDate + 'T00:00:00') <= new Date()) ? true : false;
+        const isOverdue = (periodToDisplay && new Date(periodToDisplay.dueDate + 'T00:00:00') <= new Date()) ? true : false;
         const status = isArchived ? 'archived' : (isPaid ? 'paid' : (isOverdue ? 'overdue' : (debt.paidAmount > 0 ? 'partial' : 'active')));
         const statusLabels = { paid: 'Погашен', partial: 'Частично', active: 'Активен', overdue: 'Просрочен', archived: 'В архиве' };
         
@@ -687,7 +670,7 @@ function renderDebts() {
                 </div>
                 <div class="debt-category">${categoryName} ${repeatLabel ? '🔄 ' + repeatLabel : ''}</div>
                 <div class="debt-amount">
-                    ${displayAmount.toFixed(2)} ₽
+                    ${(isRepeat ? totalRemaining : displayAmount).toFixed(2)} ₽
                     ${debt.paidAmount > 0 ? `<span class="paid-amount">(погашено ${debt.paidAmount.toFixed(2)} ₽)</span>` : ''}
                 </div>
                 <div class="debt-progress">
