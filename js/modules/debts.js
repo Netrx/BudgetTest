@@ -272,7 +272,6 @@ function syncAllAutomaticPeriods() {
             const future = debt.periods
                 .filter(p => p.dueDate > todayStr && Number(p.paidAmount || 0) < Number(p.amount || 0))
                 .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
-            const keepFutureId = future[0]?.id;
             const extraFuture = new Set(future.slice(1).map(p => p.id));
             if (extraFuture.size) {
                 debt.periods = debt.periods.filter(p => !extraFuture.has(p.id));
@@ -492,7 +491,7 @@ function populateCategoryFilter() {
     });
 }
 
-// ===== ОТОБРАЖЕНИЕ ДОЛГОВ (С ИСПРАВЛЕННОЙ ИСТОРИЕЙ И ДЕЛЕГИРОВАНИЕМ) =====
+// ===== ОТОБРАЖЕНИЕ ДОЛГОВ =====
 function renderDebts() {
     const allDebts = getDebts();
     const categories = storageInstance.getCategories();
@@ -601,18 +600,16 @@ function renderDebts() {
         
         if (isRepeat) {
             const sortedPeriods = [...periods].sort((a, b) => new Date(a.dueDate + 'T00:00:00') - new Date(b.dueDate + 'T00:00:00'));
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
             
-            // Ближайший неоплаченный период — именно его показываем в карточке.
-            // Уже оплаченные периоды (в т.ч. просроченные, но оплаченные) пропускаем.
+            // Ищем текущий (ближайший неоплаченный) период для отображения
             const unpaidPeriods = sortedPeriods.filter(p => Number(p.paidAmount || 0) < Number(p.amount || 0));
             
             periodToDisplay = unpaidPeriods[0] || null;
             nextPeriod = unpaidPeriods[0] || null;
             
+            // ВСЕГДА показываем сумму текущего периода (или базовую, если периодов нет)
             if (periodToDisplay) {
-                displayAmount = periodToDisplay.amount;
+                displayAmount = periodToDisplay.amount; // Берем сумму именно текущего периода
             } else {
                 displayAmount = debt.baseAmount || 0;
             }
@@ -670,7 +667,7 @@ function renderDebts() {
                 </div>
                 <div class="debt-category">${categoryName} ${repeatLabel ? '🔄 ' + repeatLabel : ''}</div>
                 <div class="debt-amount">
-                    ${(isRepeat ? totalRemaining : displayAmount).toFixed(2)} ₽
+                    ${displayAmount.toFixed(2)} ₽
                     ${debt.paidAmount > 0 ? `<span class="paid-amount">(погашено ${debt.paidAmount.toFixed(2)} ₽)</span>` : ''}
                 </div>
                 <div class="debt-progress">
